@@ -3,7 +3,7 @@ import bmesh
 import mathutils
 import math
 
-from typing import List, Dict, Tuple
+from typing import List, Dict, Union
 
 def str_loop(loop:bmesh.types.BMLoop) -> str:
     """more compact print of a bmloop"""
@@ -147,7 +147,7 @@ def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
     return edge_rings
 
 
-def find_uv_edgering_next(a:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Tuple(None, bmesh.types.BMLoop):
+def find_uv_edgering_next(a:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Union[None, bmesh.types.BMLoop]:
     '''returns the next loop from an uv edgering'''
 
     """
@@ -245,7 +245,7 @@ def select_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.type
                 connected_uv.select = True
 
 
-def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Tuple(None, bmesh.types.BMLoop):
+def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Union[None, bmesh.types.BMLoop]:
     '''searches the next loop of a uv edgeloop'''
 
     """
@@ -320,7 +320,7 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
     return p
 
 
-def find_uv_edgeloop_prev(start_loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Tuple(None, bmesh.types.BMLoop):
+def find_uv_edgeloop_prev(start_loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Union[None, bmesh.types.BMLoop]:
     '''searches the previous loop of a uv edgeloop'''
 
     # print("prev current: ", str_loop(start_loop))

@@ -3,7 +3,7 @@ import math
 import mathutils
 import bmesh
 
-from typing import List, Dict, Tuple
+from typing import List
 
 class BBoxUV():
     '''Store bounds of uv loops'''
