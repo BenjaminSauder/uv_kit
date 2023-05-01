@@ -3,7 +3,8 @@ Small uv utility collection
 
 Currently found in the uv editor -> tool category
 
-![grafik](https://user-images.githubusercontent.com/13512160/235476892-9e3120ba-3bdf-4656-a447-3fdd2bbe7318.png)
+![grafik](https://user-images.githubusercontent.com/13512160/235482990-767823b4-f5c1-41f8-a93c-f279c74e9baf.png)
+
 
 - Map channels: choose uv channel, added here for convenience. 
 - Select Ring: selects uv edgerings from the current edge selection, +/- buttons to expand/shrink the uv edgering by one edge.
