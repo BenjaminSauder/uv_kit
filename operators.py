@@ -35,6 +35,18 @@ unwrap_modes = (
 )
 
 
+def is_uv_edit_mode():
+    if not bpy.context.active_object:
+            return False
+    if bpy.context.active_object.type != 'MESH':
+        return False
+    if bpy.context.active_object.mode != 'EDIT':
+        return False
+    if bpy.context.scene.tool_settings.use_uv_select_sync:
+        return False
+    return True
+
+
 class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
     bl_idname = "view2d.uvkit_select_uv_edgeloop"
     bl_label = "uvkit select uv edge loop"
@@ -42,6 +54,10 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
     bl_description = "Select uv edgeloop"
 
     mode: bpy.props.EnumProperty(name="Mode", items=expand_modes)
+
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
 
     def execute(self, context):
         # print("#" * 66)
@@ -96,6 +112,10 @@ class UV_OT_uvkit_select_uv_edgering(bpy.types.Operator):
     bl_description = "Select UV edgering"
 
     mode: bpy.props.EnumProperty(name="Mode", items=expand_modes)
+    
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
 
     def execute(self, context):
         # print("#" * 66)
@@ -156,6 +176,10 @@ ALT - use global values"""
     apply_per_edgeloop: bpy.props.BoolProperty(name="Apply per loop", default=True)
     direction: bpy.props.EnumProperty(name="Direction", items=align_directions)
     mode: bpy.props.EnumProperty(name="Mode", items=align_modes)
+
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
 
     def execute(self, context):
         # print( "#" * 66)
@@ -278,6 +302,10 @@ class UV_OT_uvkit_spread_loop(bpy.types.Operator):
 
     mode: bpy.props.EnumProperty(name="Mode", items=straighten_modes)
 
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
+
     def execute(self, context):
         # print("#"*66)
         for obj in context.selected_objects:
@@ -370,6 +398,10 @@ Alt - ignore seams and pins"""
     mode: bpy.props.EnumProperty(name="Mode", items=unwrap_modes)
     ignore_seams: bpy.props.BoolProperty(name="Ignore edge seams", default=False)
     ignore_pins: bpy.props.BoolProperty(name="Ignore pinned uv", default=False)
+
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
 
     def execute(self, context):
         for obj in context.selected_objects:
