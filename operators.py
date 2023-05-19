@@ -491,6 +491,25 @@ Alt - ignore seams and pins"""
 
         self.execute(context)
         return {"FINISHED"}
+    
+
+class UV_OT_uvkit_show_image(bpy.types.Operator):
+    # heavily copied from Reinier Goijvaerts
+    bl_idname = "view2d.uvkit_show_image"
+    bl_label = "Show Image"
+    bl_options = {"INTERNAL"}
+
+    image_name: bpy.props.StringProperty(name='image_name', default='')
+    
+    def execute(self, context):        
+        for area in bpy.context.screen.areas:
+            if area.type == 'IMAGE_EDITOR':
+                for image in bpy.data.images:
+                    if image.name == self.image_name:
+                        area.spaces.active.image = image
+                
+        return {'FINISHED'}
+    
 
 
 # -------------------------------------------------------------------
@@ -503,6 +522,7 @@ classes = [
     UV_OT_uvkit_select_uv_edgeloop,
     UV_OT_uvkit_align_uv_edgeloops,
     UV_OT_uvkit_constrained_unwrap,
+    UV_OT_uvkit_show_image,
 ]
 
 
