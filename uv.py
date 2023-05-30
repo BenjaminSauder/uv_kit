@@ -19,9 +19,7 @@ def link_loop_is_uv_connected(loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLa
     '''see if the uv edge is split'''
     a = loop
     b = loop.link_loop_radial_next
-    use_same_locations = is_same_uv_location(
-        a[uv_layer].uv, b.link_loop_next[uv_layer].uv
-    ) and is_same_uv_location(b[uv_layer].uv, a.link_loop_next[uv_layer].uv)
+    use_same_locations = is_same_uv_location(a[uv_layer].uv, b.link_loop_next[uv_layer].uv) and is_same_uv_location(b[uv_layer].uv, a.link_loop_next[uv_layer].uv)
 
     return use_same_locations
 
@@ -465,46 +463,61 @@ def select_uv_edgeloop(uv_edgeloop:List[bmesh.types.BMLoop], uv_layer:bmesh.type
                 connected_uv.select = True
 
 
-def find_uv_islands_for_selected_uv_loops(intial_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.types.BMLayerItem) -> List[List[bmesh.types.BMLoop]]:
+
+def find_uv_islands_for_selected_uv_loops(bm:bmesh.types.BMesh, uv_layer:bmesh.types.BMLayerItem) -> List[List[bmesh.types.BMLoop]]:
     '''returns a list of uv islands which are searched from the initial loops - uv islands are unordered lists of uv loops'''
 
-    islands = []
-    search_loops = set(intial_loops)
-    while len(search_loops) > 0:
-        seed = search_loops.pop()
+    # https://blender.stackexchange.com/questions/48827/how-to-get-lists-of-uv-island-from-python-script
+    from collections import defaultdict
+    
+    bm.faces.ensure_lookup_table()
+    
+    face_to_verts = defaultdict(set)
+    vert_to_faces = defaultdict(set)
+   
+    selected_faces = [f for f in bm.faces if f.select]
+    
+    for f in selected_faces:
+        for l in f.loops:
+            luv = l[uv_layer]
+            id = luv.uv.to_tuple(5), l.vert.index
+            face_to_verts[f.index].add(id)
+            vert_to_faces[id].add(f.index)
+    
+    def parse_island(bm, face_idx, faces_left, island):
+        if face_idx in faces_left:
+            faces_left.remove(face_idx)
+            
+            face = bm.faces[face_idx]
+            for loop in face.loops:
+                island.verts.add(loop)
 
-        already_searched = set()
-        already_searched.add(seed.index)
+                if not island.selected: 
+                    island.selected = loop[uv_layer].select
 
-        island = []
-        island.append(seed)
-        candindates = [seed]
+            for v in face_to_verts[face_idx]:
+                connected_faces = vert_to_faces[v]
+                if connected_faces:
+                    for connected_face in connected_faces:
+                        parse_island(bm, connected_face, faces_left, island)
 
-        while len(candindates) > 0:
-            current = candindates.pop()
+    class Island():
+        def __init__(self):
+            self.verts = set()
+            self.selected = False 
 
-            for face_connected in current.face.loops:
-                if not face_connected.face.select:
-                    continue
+    uv_island_lists = []
+    faces_left = set(face_to_verts.keys())
+    while len(faces_left) > 0:
+        current_island = Island()
+        face_idx = list(faces_left)[0]
+        parse_island(bm, face_idx, faces_left, current_island)
+        uv_island_lists.append(current_island)   
 
-                if face_connected.index in already_searched:
-                    continue
-                already_searched.add(face_connected.index)
-
-                island.append(face_connected)
-
-                if face_connected in search_loops:
-                    search_loops.remove(face_connected)
-
-                if link_loop_is_uv_connected(face_connected, uv_layer):
-                    for (
-                        other_face_connected
-                    ) in face_connected.link_loop_radial_next.face.loops:
-                        if not other_face_connected.face.select:
-                            continue
-
-                        if other_face_connected.index not in already_searched:
-                            candindates.append(other_face_connected)
-
-        islands.append(island)
-    return islands
+    result: List[bmesh.types.BMLoop] = []
+    for island in uv_island_lists:        
+        if island.selected:
+            result.append(list(island.verts))
+    return result
+    
+    

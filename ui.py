@@ -67,6 +67,30 @@ class IMAGE_PT_uvkit_main(Panel):
         row.operator("mesh.uv_texture_remove", icon='REMOVE', text="")
 
 
+        box = layout.box()	
+        box.label(text="UV align tools")
+        row = box.column(align=True).row(align=True)
+        col = row.column(align=True)
+
+        col = row.column(align=True)
+        col.operator("view2d.uvkit_align", text="↖").direction = "topleft"
+        col.operator("view2d.uvkit_align", text="← ").direction = "left"
+        col.operator("view2d.uvkit_align", text="↙").direction = "bottomleft"
+              
+        col = row.column(align=True)
+        col.operator("view2d.uvkit_align", text="↑").direction = "top"
+        col.operator("view2d.uvkit_align", text="+").direction = "center"
+        col.operator("view2d.uvkit_align", text="↓").direction = "bottom"
+
+        col = row.column(align=True)
+        col.operator("view2d.uvkit_align", text="↗").direction = "topright"
+        col.operator("view2d.uvkit_align", text=" →").direction = "right"
+        col.operator("view2d.uvkit_align", text="↘").direction = "bottomright"
+
+        row = box.row(align=True)
+        row.operator("view2d.uvkit_align", text="—").direction = "horizontal"
+        row.operator("view2d.uvkit_align", text="|").direction = "vertical"
+
         box = layout.box()
         box.label(text="UV edgeloop tools")
 
