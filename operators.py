@@ -41,7 +41,7 @@ unwrap_modes = (
 
 def is_uv_edit_mode():
     if not bpy.context.active_object:
-            return False
+        return False
     if bpy.context.active_object.type != 'MESH':
         return False
     if bpy.context.active_object.mode != 'EDIT':
@@ -395,9 +395,9 @@ class UV_OT_uvkit_constrained_unwrap(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     bl_description = """Keeps the selected uv's in place/pinned and unwraps the unselected rest of the uv island.
 
-Shift - ignore seams.
-Ctrl - ignore pins.
-Alt - ignore seams and pins"""
+SHIFT - ignore seams.
+CTRL - ignore pins.
+ALT - ignore seams and pins"""
 
     mode: bpy.props.EnumProperty(name="Mode", items=unwrap_modes)
     ignore_seams: bpy.props.BoolProperty(name="Ignore edge seams", default=False)
@@ -518,9 +518,12 @@ class UV_OT_uvkit_align(bpy.types.Operator):
     bl_idname = "view2d.uvkit_align"
     bl_label = "Align"
     bl_options = {"REGISTER", "UNDO"}
+    bl_description = """Aligns the selection or the Cursor.
+
+CTRL - use 0-1 space as boundary.
+ALT - set the Cursor"""
 
     align_selection: bpy.props.BoolProperty(name="Align selection", default=False)
-    move_selection: bpy.props.BoolProperty(name="Move selection", default=False)
     direction: bpy.props.StringProperty(name='Direction', default='center')
     use_unit_square: bpy.props.BoolProperty(name="Use 0-1 space", default=False)
     set_cursor: bpy.props.BoolProperty(name="Set Cursor", default=False)
@@ -590,11 +593,7 @@ class UV_OT_uvkit_align(bpy.types.Operator):
             for part in parts:
                 bm = part.bm
                 uv_layer = part.uv_layer
-                
-                def move(island, offset):
-                    for loop in island:
-                        loop[uv_layer].uv += offset
-
+               
                 if face_or_island_selection_mode:
                     for i, island in enumerate(part.uv_islands):
                         island_bbox: BBoxUV = part.uv_islands_bounds[i]
@@ -628,7 +627,8 @@ class UV_OT_uvkit_align(bpy.types.Operator):
                             delta = global_bbox.center - island_bbox.center
                             delta.x = 0
 
-                        move(island, delta)
+                        for loop in island:
+                            loop[uv_layer].uv += delta
 
                 else:
                     for loop in part.selected_uvs:
@@ -663,14 +663,11 @@ class UV_OT_uvkit_align(bpy.types.Operator):
 
     def invoke(self, context: Context, event: Event) -> Set[str]:
         self.set_cursor = False
-        self.move_selection = False
         self.align_selection = False
         self.use_unit_square = False
 
         if event.alt:
             self.set_cursor = True
-        elif event.shift:
-            self.move_selection = True
         else:
             self.align_selection = True
 
@@ -699,6 +696,8 @@ def register():
     import importlib
     from . import bbox
     importlib.reload(bbox)
+    from . import uv
+    importlib.reload(uv)
 
     for c in classes:
         bpy.utils.register_class(c)

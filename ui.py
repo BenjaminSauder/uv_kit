@@ -57,18 +57,18 @@ class IMAGE_PT_uvkit_main(Panel):
 
         mesh = context.edit_object.data
 
-        box = layout.box()
-        row = box.row()
-        col = row.column()
+        # box = layout.box()
+        # row = box.row()
+        # col = row.column()
 
-        row.prop_search(mesh.uv_layers, "active", mesh, "uv_layers", text="")
+        layout.prop_search(mesh.uv_layers, "active", mesh, "uv_layers", text="")
        
-        row.operator("mesh.uv_texture_add", icon='ADD', text="")
-        row.operator("mesh.uv_texture_remove", icon='REMOVE', text="")
+        # row.operator("mesh.uv_texture_add", icon='ADD', text="")
+        # row.operator("mesh.uv_texture_remove", icon='REMOVE', text="")
 
 
         box = layout.box()	
-        box.label(text="UV align tools")
+        box.label(text="UV and Cursor align")
         row = box.column(align=True).row(align=True)
         col = row.column(align=True)
 
@@ -127,7 +127,24 @@ class IMAGE_PT_uvkit_main(Panel):
         
         col.operator("view2d.uvkit_constrained_unwrap", text="Constrained Unwrap")
 
-        
+class IMAGE_MT_uvkit_align_PIE(bpy.types.Menu):
+    bl_label = 'UV kit Align'
+    bl_idname = 'IMAGE_MT_uvkit_align_pie' 
+    
+    def draw(self, context):
+        layout = self.layout
+        pie = layout.menu_pie()   
+    
+        # left
+        pie.operator("view2d.uvkit_align", text="Left").direction = "left"
+        pie.operator("view2d.uvkit_align", text="Right").direction = "right"
+        pie.operator("view2d.uvkit_align", text="Bottom").direction = "bottom"
+        pie.operator("view2d.uvkit_align", text="Top").direction = "top"
+        pie.operator("view2d.uvkit_align", text="Top Left").direction = "topleft"
+        pie.operator("view2d.uvkit_align", text="Top Right").direction = "topright"
+        pie.operator("view2d.uvkit_align", text="Bottom Left").direction = "bottomleft"
+        pie.operator("view2d.uvkit_align", text="Bottom Right").direction = "bottomright"
+       
 
 # -------------------------------------------------------------------
 #   Register & Unregister
@@ -137,14 +154,29 @@ classes = [
     #ui panels
     IMAGE_PT_uvkit_main,
     IMAGE_PT_uvkit_imageList,
+    IMAGE_MT_uvkit_align_PIE,
 ]
 
+addon_keymaps = []
 
 def register():    
     for c in classes:
         bpy.utils.register_class(c)
 
+    wm = bpy.context.window_manager     
+    if  wm.keyconfigs.addon:
+        keymap = wm.keyconfigs.addon.keymaps.new(name='UV Editor', space_type='EMPTY', region_type="WINDOW")
+
+        keymap_item = keymap.keymap_items.new("wm.call_menu_pie", type="NONE", value='PRESS', ctrl=False)
+        keymap_item.properties.name = "IMAGE_MT_uvkit_align_pie"         
+        addon_keymaps.append((keymap, keymap_item))
+
+
 def unregister():
+    for keymap, keymap_item in addon_keymaps:
+        keymap.keymap_items.remove(keymap_item)
+    addon_keymaps.clear()   
+
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
 
