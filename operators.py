@@ -514,6 +514,7 @@ class UV_OT_uvkit_show_image(bpy.types.Operator):
                 
         return {'FINISHED'}
     
+
 class UV_OT_uvkit_align(bpy.types.Operator):
     bl_idname = "view2d.uvkit_align"
     bl_label = "Align"
@@ -657,9 +658,7 @@ ALT - set the Cursor"""
 
             bmesh.update_edit_mesh(part.mesh)
         return {"FINISHED"}
-
-
-    
+  
 
     def invoke(self, context: Context, event: Event) -> Set[str]:
         self.set_cursor = False
@@ -676,6 +675,98 @@ ALT - set the Cursor"""
         
         return self.execute(context)
 
+
+class UV_OT_uvkit_rotate_shell(bpy.types.Operator):
+    bl_idname = "view2d.uvkit_rotate_shell"
+    bl_label = "Rotate 90 degrees"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = """Rotate the selected UV island 90 degrees left or right"
+
+CTRL - use Bounding Box Center.
+ALT - use Cursor
+"""
+    
+    angle : bpy.props.FloatProperty(name="Angle")
+    use_boundingbox: bpy.props.BoolProperty(name="Use Boundingbox Center", default=False)
+    use_cursor: bpy.props.BoolProperty(name="Use Cursor", default=False)
+
+    @classmethod
+    def poll(cls, context):
+        if bpy.context.area.type != 'IMAGE_EDITOR':
+            return False
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.type != 'MESH':
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        if not bpy.context.object.data.uv_layers:
+            return False
+        if bpy.context.scene.tool_settings.use_uv_select_sync:
+            return False
+        return True
+
+    def execute(self, context):
+
+        class Part():
+            def __init__(self):
+                self.mesh = None
+                self.bm = None
+                self.uv_layer = None
+                self.selected = []
+
+        # store selected uv loops
+        parts = []    
+        for obj in context.selected_objects:
+            if obj.mode != "EDIT" or obj.type != "MESH":
+                continue
+
+            bm = bmesh.from_edit_mesh(obj.data)
+            uv_layer = bm.loops.layers.uv.verify()
+            
+            part = Part()
+            part.mesh = obj.data
+            part.bm = bm
+            part.uv_layer = uv_layer
+            part.selected = get_selected_uv_vert_loops(bm, uv_layer)
+            parts.append(part)
+
+        # remember initial pivot point setting
+        intial_pivot_point = context.space_data.pivot_point 
+
+        context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+        if self.use_cursor:
+            context.space_data.pivot_point = 'CURSOR'
+        elif self.use_boundingbox:
+            context.space_data.pivot_point = 'CENTER'    
+
+        bpy.ops.uv.select_linked()
+        bpy.ops.transform.rotate(value=self.angle, orient_axis='Z', constraint_axis=(False, False, False), use_proportional_edit=False)
+        bpy.ops.uv.select_all(action='DESELECT')
+
+        context.space_data.pivot_point = intial_pivot_point 
+
+        # regenerate the selection state
+        for part in parts:
+            bm = part.bm
+            uv_layer = part.uv_layer
+            for loop in part.selected:
+                loop[uv_layer].select = True
+            bmesh.update_edit_mesh(part.mesh)
+
+        return {'FINISHED'}
+
+    def invoke(self, context: Context, event: Event):
+        self.use_boundingbox = False
+        self.use_cursor = False
+
+        if event.ctrl:
+            self.use_boundingbox = True
+        elif event.alt:
+            self.use_cursor = True
+
+        return self.execute(context)
+
 # -------------------------------------------------------------------
 #   Register & Unregister
 # -------------------------------------------------------------------
@@ -688,6 +779,7 @@ classes = [
     UV_OT_uvkit_constrained_unwrap,
     UV_OT_uvkit_show_image,
     UV_OT_uvkit_align,
+    UV_OT_uvkit_rotate_shell,
 ]
 
 
