@@ -174,8 +174,8 @@ class UV_OT_uvkit_align_uv_edgeloops(bpy.types.Operator):
     bl_description = """Aligns uv edgeloops
     
 SHIFT - align to max value.
-CTRL - align to min value.
-ALT - use global values"""
+ALT   - align to min value.
+CTRL  - use global values"""
 
     apply_per_edgeloop: bpy.props.BoolProperty(name="Apply per loop", default=True)
     direction: bpy.props.EnumProperty(name="Direction", items=align_directions)
@@ -286,10 +286,10 @@ ALT - use global values"""
 
         if event.shift:
             self.mode = align_modes[2][0]
-        elif event.ctrl:
+        elif event.alt:
             self.mode = align_modes[1][0]
 
-        if event.alt:
+        if event.ctrl:
             self.apply_per_edgeloop = False
         else:
             self.apply_per_edgeloop = True
@@ -396,8 +396,8 @@ class UV_OT_uvkit_constrained_unwrap(bpy.types.Operator):
     bl_description = """Keeps the selected uv's in place/pinned and unwraps the unselected rest of the uv island.
 
 SHIFT - ignore seams.
-CTRL - ignore pins.
-ALT - ignore seams and pins"""
+CTRL  - ignore pins.
+ALT   - ignore seams and pins"""
 
     mode: bpy.props.EnumProperty(name="Mode", items=unwrap_modes)
     ignore_seams: bpy.props.BoolProperty(name="Ignore edge seams", default=False)
@@ -521,10 +521,11 @@ class UV_OT_uvkit_align(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
     bl_description = """Aligns the selection or the Cursor.
 
-CTRL - use 0-1 space as boundary.
-ALT - set the Cursor"""
+SHIFT - move island instead of align selection
+CTRL  - use 0-1 space as boundary.
+ALT   - set the Cursor"""
 
-    align_selection: bpy.props.BoolProperty(name="Align selection", default=False)
+    move_island: bpy.props.BoolProperty(name="Move Island", default=False)
     direction: bpy.props.StringProperty(name='Direction', default='center')
     use_unit_square: bpy.props.BoolProperty(name="Use 0-1 space", default=False)
     set_cursor: bpy.props.BoolProperty(name="Set Cursor", default=False)
@@ -543,8 +544,8 @@ ALT - set the Cursor"""
         parts = []
         has_uv_selection = False
 
-        selection_mode = context.scene.tool_settings.uv_select_mode
-        face_or_island_selection_mode = selection_mode == 'FACE' or selection_mode == 'ISLAND'
+        # selection_mode = context.scene.tool_settings.uv_select_mode
+        # face_or_island_selection_mode = selection_mode == 'FACE' or selection_mode == 'ISLAND'
 
         for obj in context.selected_objects:
             if obj.mode != "EDIT" or obj.type != "MESH":
@@ -560,7 +561,7 @@ ALT - set the Cursor"""
 
             uv_islands: List[bmesh.types.BMLoop] = []
             uv_islands_bounds: List[BBoxUV] = []
-            if face_or_island_selection_mode:
+            if self.move_island:
                 uv_islands = find_uv_islands_for_selected_uv_loops(bm, uv_layer)       
                 print(f"islands: {len(uv_islands)}")
                 for island in uv_islands:
@@ -575,100 +576,104 @@ ALT - set the Cursor"""
             part.uv_islands_bounds = uv_islands_bounds
             parts.append(part)
 
-            if face_or_island_selection_mode:
+            if self.move_island:
                 for bbox in part.uv_islands_bounds:
                     global_bbox.merge(bbox)
             else:
                 global_bbox.merge(BBoxUV(selected_uv_loops, uv_layer))
 
-
-        if not has_uv_selection or self.use_unit_square:
+        if not has_uv_selection:
+            return {"FINISHED"}
+        
+        if self.use_unit_square:
             global_bbox.set_to_unit_square()                    
 
         if self.set_cursor:
             space_data = context.space_data
             space_data.cursor_location = global_bbox.get_location(self.direction)
             return {"FINISHED"}
-               
-        if self.align_selection and has_uv_selection:
-            for part in parts:
-                bm = part.bm
-                uv_layer = part.uv_layer
-               
-                if face_or_island_selection_mode:
-                    for i, island in enumerate(part.uv_islands):
-                        island_bbox: BBoxUV = part.uv_islands_bounds[i]
-                    
-                        if self.direction == 'left':
-                            delta = global_bbox.left - island_bbox.left
-                            delta.y = 0 
-                        elif self.direction == 'topleft':
-                            delta = global_bbox.topleft - island_bbox.topleft                           
-                        elif self.direction == 'top':
-                            delta = global_bbox.top - island_bbox.top
-                            delta.x = 0 
-                        elif self.direction == 'topright':
-                            delta = global_bbox.topright - island_bbox.topright
-                        elif self.direction == 'right':
-                            delta = global_bbox.right - island_bbox.right
-                            delta.y = 0 
-                        elif self.direction == 'bottomright':
-                            delta = global_bbox.bottomright - island_bbox.bottomright
-                        elif self.direction == 'bottom':
-                            delta = global_bbox.bottom - island_bbox.bottom
-                            delta.x = 0 
-                        elif self.direction == 'bottomleft':
-                            delta = global_bbox.bottomleft - island_bbox.bottomleft
-                        elif self.direction == 'center':
-                            delta = global_bbox.center - island_bbox.center
-                        elif self.direction == 'horizontal':
-                            delta = global_bbox.center - island_bbox.center
-                            delta.y = 0
-                        elif self.direction == 'vertical':
-                            delta = global_bbox.center - island_bbox.center
-                            delta.x = 0
+                       
+        for part in parts:
+            bm = part.bm
+            uv_layer = part.uv_layer
+            
+            if self.move_island:
+                for i, island in enumerate(part.uv_islands):
+                    island_bbox: BBoxUV = part.uv_islands_bounds[i]
+                
+                    if self.direction == 'left':
+                        delta = global_bbox.left - island_bbox.left
+                        delta.y = 0 
+                    elif self.direction == 'topleft':
+                        delta = global_bbox.topleft - island_bbox.topleft                           
+                    elif self.direction == 'top':
+                        delta = global_bbox.top - island_bbox.top
+                        delta.x = 0 
+                    elif self.direction == 'topright':
+                        delta = global_bbox.topright - island_bbox.topright
+                    elif self.direction == 'right':
+                        delta = global_bbox.right - island_bbox.right
+                        delta.y = 0 
+                    elif self.direction == 'bottomright':
+                        delta = global_bbox.bottomright - island_bbox.bottomright
+                    elif self.direction == 'bottom':
+                        delta = global_bbox.bottom - island_bbox.bottom
+                        delta.x = 0 
+                    elif self.direction == 'bottomleft':
+                        delta = global_bbox.bottomleft - island_bbox.bottomleft
+                    elif self.direction == 'center':
+                        delta = global_bbox.center - island_bbox.center
+                    elif self.direction == 'horizontal':
+                        delta = global_bbox.center - island_bbox.center
+                        delta.y = 0
+                    elif self.direction == 'vertical':
+                        delta = global_bbox.center - island_bbox.center
+                        delta.x = 0
 
-                        for loop in island:
-                            loop[uv_layer].uv += delta
+                    for loop in island:
+                        loop[uv_layer].uv += delta
 
-                else:
-                    for loop in part.selected_uvs:
-                        if self.direction == 'left':
-                            loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
-                        elif self.direction == 'topleft':
-                            loop[uv_layer].uv = global_bbox.get_location(self.direction)
-                        elif self.direction == 'top':
-                            loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
-                        elif self.direction == 'topright':
-                            loop[uv_layer].uv = global_bbox.get_location(self.direction)
-                        elif self.direction == 'right':
-                            loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
-                        elif self.direction == 'bottomright':
-                            loop[uv_layer].uv = global_bbox.get_location(self.direction)
-                        elif self.direction == 'bottom':
-                            loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
-                        elif self.direction == 'bottomleft':
-                            loop[uv_layer].uv = global_bbox.get_location(self.direction)
-                        elif self.direction == 'center':
-                            loop[uv_layer].uv = global_bbox.get_location(self.direction)
-                        elif self.direction == 'horizontal':
-                            loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
-                        elif self.direction == 'vertical':
-                            loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
+            else:
+                for loop in part.selected_uvs:
+                    if self.direction == 'left':
+                        loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
+                    elif self.direction == 'topleft':
+                        loop[uv_layer].uv = global_bbox.get_location(self.direction)
+                    elif self.direction == 'top':
+                        loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
+                    elif self.direction == 'topright':
+                        loop[uv_layer].uv = global_bbox.get_location(self.direction)
+                    elif self.direction == 'right':
+                        loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
+                    elif self.direction == 'bottomright':
+                        loop[uv_layer].uv = global_bbox.get_location(self.direction)
+                    elif self.direction == 'bottom':
+                        loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
+                    elif self.direction == 'bottomleft':
+                        loop[uv_layer].uv = global_bbox.get_location(self.direction)
+                    elif self.direction == 'center':
+                        loop[uv_layer].uv = global_bbox.get_location(self.direction)
+                    elif self.direction == 'horizontal':
+                        loop[uv_layer].uv.y = global_bbox.get_location(self.direction).y
+                    elif self.direction == 'vertical':
+                        loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
 
-            bmesh.update_edit_mesh(part.mesh)
+        bmesh.update_edit_mesh(part.mesh)
         return {"FINISHED"}
   
 
     def invoke(self, context: Context, event: Event) -> Set[str]:
         self.set_cursor = False
-        self.align_selection = False
+       
+        self.move_island = False
         self.use_unit_square = False
 
         if event.alt:
             self.set_cursor = True
         else:
-            self.align_selection = True
+            if event.shift:
+                self.move_island = True
+         
 
         if event.ctrl:
             self.use_unit_square = True
@@ -680,10 +685,10 @@ class UV_OT_uvkit_rotate_shell(bpy.types.Operator):
     bl_idname = "view2d.uvkit_rotate_shell"
     bl_label = "Rotate 90 degrees"
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = """Rotate the selected UV island 90 degrees left or right"
+    bl_description = """Rotate the selected UV island 90 degrees left or right
 
 CTRL - use Bounding Box Center.
-ALT - use Cursor
+ALT  - use Cursor
 """
     
     angle : bpy.props.FloatProperty(name="Angle")
@@ -752,7 +757,13 @@ ALT - use Cursor
             uv_layer = part.uv_layer
             for loop in part.selected:
                 loop[uv_layer].select = True
+           
             bmesh.update_edit_mesh(part.mesh)
+
+        # flush selection... bit ugly..
+        uv_selection_mode = context.tool_settings.uv_select_mode        
+        bpy.ops.uv.select_mode(type='VERTEX')
+        bpy.ops.uv.select_mode(type=uv_selection_mode)
 
         return {'FINISHED'}
 

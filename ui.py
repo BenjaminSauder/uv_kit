@@ -93,8 +93,8 @@ class IMAGE_PT_uvkit_main(Panel):
         row.operator("view2d.uvkit_align", text="|").direction = "vertical"
 
         row = box.row(align=True)
-        row.operator("view2d.uvkit_rotate_shell", text="↺").angle = -math.pi / 2
-        row.operator("view2d.uvkit_rotate_shell", text="↻").angle = -math.pi / 2
+        row.operator("view2d.uvkit_rotate_shell", text="Turn Left").angle = -math.pi / 2
+        row.operator("view2d.uvkit_rotate_shell", text="Turn Right").angle = -math.pi / 2
 
         box = layout.box()
         box.label(text="UV edgeloop tools")
