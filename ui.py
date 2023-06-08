@@ -1,5 +1,7 @@
 import math
 import bpy
+import bmesh
+
 
 from bpy.props import (IntProperty,
                        BoolProperty,
@@ -13,6 +15,7 @@ from bpy.types import (Operator,
                        UIList)
 
 
+
 class IMAGE_PT_uvkit_imageList(bpy.types.Menu):
     # heavily copied from Reinier Goijvaerts
     bl_idname = "uvkit_imageList"
@@ -21,17 +24,36 @@ class IMAGE_PT_uvkit_imageList(bpy.types.Menu):
     bl_region_type = 'UI'
 
     def draw(self, context):
-        layout = self.layout        
+        layout = self.layout              
         
-        active_mat = bpy.context.active_object.active_material        
-        if active_mat.use_nodes:
-            for node in active_mat.node_tree.nodes:
-                if node.type == 'TEX_IMAGE':
-                    image = node.image
+        obj = bpy.context.active_object
+        
+        materials = []
+        if obj.type == 'MESH' and obj.mode == 'EDIT':
+            mesh = bmesh.from_edit_mesh(obj.data)
+            material_indices = [face.material_index for face in mesh.faces if face.select]
+            for index in material_indices:
+                mat = obj.material_slots[index].material
+                if mat.use_nodes and mat not in materials:
+                    materials.append(mat)
+        else:
+            active_mat = bpy.context.active_object.active_material
+            if active_mat.use_nodes:
+                materials.append(active_mat)
 
-                    if image is not None:
-                        button = layout.operator("view2d.uvkit_show_image", text=image.name, icon_value=layout.icon(image))
-                        button.image_name = image.name
+        for mat in materials:   
+            if not mat:
+                continue
+
+            for node in mat.node_tree.nodes:
+                if node.type != 'TEX_IMAGE':
+                    continue
+
+                if not node.image:
+                    continue
+              
+                button = layout.operator("view2d.uvkit_show_image", text=node.image.name, icon_value=layout.icon(node.image))
+                button.image_name = node.image.name
 
 
 class IMAGE_PT_uvkit_main(Panel):
