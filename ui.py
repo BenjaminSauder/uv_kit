@@ -24,9 +24,6 @@ class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
 
-    #def poll(self, context):
-    #    return context.active_object.active_material != None
-
     def draw(self, context):
         layout = self.layout              
         
@@ -89,10 +86,11 @@ class IMAGE_PT_uvkit_main(Panel):
 
         layout.menu(IMAGE_MT_uvkit_imageList.bl_idname)
         
-        if not show_uvedit:
-            return  
+        #if not show_uvedit:
+        #    return  
 
         box = layout.box()	
+        box.enabled = show_uvedit
         box.label(text="UV and Cursor align")
         row = box.column(align=True).row(align=True)
         col = row.column(align=True)
@@ -120,7 +118,10 @@ class IMAGE_PT_uvkit_main(Panel):
         row.operator("view2d.uvkit_rotate_shell", text="Turn Left").angle = -math.pi / 2
         row.operator("view2d.uvkit_rotate_shell", text="Turn Right").angle = math.pi / 2
 
+
+
         box = layout.box()
+        box.enabled = show_uvedit
         box.label(text="UV edgeloop tools")
 
         col = box.column()        
@@ -155,6 +156,7 @@ class IMAGE_PT_uvkit_main(Panel):
         col = layout.column()
         
         col.operator("view2d.uvkit_constrained_unwrap", text="Constrained Unwrap")
+        col.enabled = show_uvedit
 
 class IMAGE_MT_uvkit_align_PIE(bpy.types.Menu):
     bl_label = 'UV kit Align'

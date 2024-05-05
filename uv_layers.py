@@ -12,34 +12,25 @@ class IMAGE_UL_UVKIT_UVLayerList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data,
                 active_propname, index):
 
-        row = layout.row()
+        row_main = layout.row()
 
         if self.layout_type == "COMPACT":
-            row.prop(item, "name", text="", emboss=False)
+            row_main.prop(item, "name", text="", emboss=False)
             return
 
-        split = row.split(align=True)
+        split = row_main.split(factor=0.5, align=True)
         split.prop(item, "name", text="", emboss=False)
         
-        row = split.row(align=True)
-       
-        row.label(text=f"{item.use_count}")
-        
+        row = split.row()
         if item.needs_sync:
-            op = row.operator(UVLayerList_OT_NewMap.bl_idname, text='S')
+            op = row.operator(UVLayerList_OT_NewMap.bl_idname, text='Sync')
             op.uv_layer_name = item.name
             op.mode = "Sync"            
         else:
-            row.label(text=" ")
+            row.label(text="")
 
-        op = row.operator(UVLayerList_OT_NewMap.bl_idname, text='C')
-        op.uv_layer_name = item.name
-        op.mode = "Duplicate"
-
-        op = row.operator(UVLayerList_OT_SetMapRenderActive.bl_idname, text='R')
-        op.uv_layer_name = item.name
-        
-        op = row.operator(UVLayerList_OT_DeleteMap.bl_idname, text='X')
+        row = split.row()
+        op = row.operator(UVLayerList_OT_SelectObjectUsingUVmap.bl_idname, text=item.use_count)
         op.uv_layer_name = item.name
 
 
@@ -62,10 +53,10 @@ class IMAGE_PT_UVKIT_UVLayersPanel(Panel):
                 if item.order_mismatch or item.needs_sync:                    
                     can_move_layers = False
                     break
-        
+      
         if len(context.selected_objects) > 1 and not can_move_layers:
             row = layout.row()                      
-            row.label(text="UV map order not synchronised between objects", icon="ERROR")
+            row.label(text="UV map order not synchronised!", icon="ERROR")
         
         if scene.uvkit_uv_list:
             row = layout.row()
@@ -73,45 +64,67 @@ class IMAGE_PT_UVKIT_UVLayersPanel(Panel):
                             "uvkit_uv_list", scene, "uvkit_uv_list_index")
         else:
             box = layout.box()	
-            box.label(text="Selected objects don't have any uv maps!", icon="ERROR" )
-          
-            op = box.operator(UVLayerList_OT_NewMap.bl_idname, text='Create UV map')
-            op.uv_layer_name = 'UVMap'
-            op.mode = "Sync"
+            if len(context.selected_objects) == 0:
+                box.label()
+            else:
+                box.label(text="Selected objects don't have any uv maps!", icon="ERROR" )
+                op = box.operator(UVLayerList_OT_NewMap.bl_idname, text='Create UV map')
+                op.uv_layer_name = 'UVMap'
+                op.mode = "Sync"
 
             box.label()
-            
-        
+                    
         row = layout.row()
-        row.operator(UVLayerList_OT_ListUp.bl_idname, text='Up')    
-        row.operator(UVLayerList_OT_ListDown.bl_idname, text='Down')
+        row.operator(UVLayerList_OT_ListUp.bl_idname, text='Up', icon='TRIA_UP')    
+        row.operator(UVLayerList_OT_ListDown.bl_idname, text='Down', icon='TRIA_DOWN')
         row.enabled = can_move_layers
 
+        row = layout.row()
+        op = row.operator(UVLayerList_OT_NewMap.bl_idname, text='Copy', icon='EDITMODE_HLT')
+        op.uv_layer_name = item.name
+        op.mode = "Duplicate"
+
+        op = row.operator(UVLayerList_OT_DeleteMap.bl_idname, text='Delete', icon='TRASH')
+        op.uv_layer_name = item.name
+
         row = layout.row() 
-        row.operator(UVLayerList_OT_ListSort_A_to_Z.bl_idname, text='Sort A-Z')
+        row.operator(UVLayerList_OT_ListSort_A_to_Z.bl_idname, text='Sort A-Z', icon='SORTALPHA')
+
+        op = row.operator(UVLayerList_OT_SetMapRenderActive.bl_idname, text='Set Render Active', icon='RESTRICT_RENDER_OFF')
+        op.uv_layer_name = item.name
+
+class IMAGE_MT_UVKIT_UVLayersMenu(bpy.types.Menu):
+  
+    bl_idname = "IMAGE_MT_UVKIT_UVLayersMenu"
+    bl_label = "UV kit Maps"
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'UI'
+
+    def draw(self, context):
+        layout = self.layout
+    
+        layout.separator()
+        row = layout.row()
+        row.label(text='UV kit Maps:')
+
+        for index, uv in enumerate(context.scene.uvkit_uv_list):
+            row = layout.row()
+            if index == context.scene.uvkit_uv_list_index:
+                text = f"→ {uv.name}"
+            else:
+                text = f"    {uv.name}"
+
+            op = row.operator(UVLayerList_OT_SwitchMap.bl_idname, text=text)
+            op.index = index    
 
 
 def uvcontext_menu_draw_func(self, context):
     layout = self.layout
     
-    layout.separator()
-    row = layout.row()
-    row.label(text='UV kit Maps:')
-
-    for index, uv in enumerate(context.scene.uvkit_uv_list):
-        row = layout.row()
-        if index == context.scene.uvkit_uv_list_index:
-            text = f"→ {uv.name}"
-        else:
-            text = f"    {uv.name}"
-
-        op = row.operator(UVLayerList_OT_SwitchMap.bl_idname, text=text)
-        op.index = index
-
-        # lets limit this to the 8 uv maps..
-        if index > 7:
-            return
-
+    if len(context.scene.uvkit_uv_list) < 8:
+        layout.menu_contents(IMAGE_MT_UVKIT_UVLayersMenu.bl_idname)
+    else:
+        layout.menu(IMAGE_MT_UVKIT_UVLayersMenu.bl_idname)
 
 #endregion UI    
 #region OPERATORS
@@ -131,10 +144,11 @@ class UVLayerList_OT_Update(Operator):
         uv_layer_names = []
         unique_uv_layer_names = []
         name_counts = []
-
+        mesh_count = 0
         for obj in context.selected_objects:
             if obj.type != 'MESH':
                 continue
+            mesh_count += 1
 
             uv_layer_names_for_obj = []
             mesh = obj.data
@@ -153,7 +167,7 @@ class UVLayerList_OT_Update(Operator):
             
         # check if the order of the names is always the same
         order_mismatch = False
-        if len(context.selected_objects) > 1:
+        if mesh_count > 1:
             for i in range(1, len(uv_layer_names)):                
                 if uv_layer_names[0] != uv_layer_names[i]:
                     order_mismatch = True
@@ -164,8 +178,8 @@ class UVLayerList_OT_Update(Operator):
             item = context.scene.uvkit_uv_list.add()
             item.name = name
             item.intial_name = item.name 
-            item.use_count = name_counts[index]
-            item.needs_sync = name_counts[index] != len(context.selected_objects)
+            item.use_count = f"{name_counts[index]}/{mesh_count}"
+            item.needs_sync = name_counts[index] != mesh_count
             item.order_mismatch = order_mismatch
    
         # lets take the active uv layer from the active_object as a guide to 
@@ -197,6 +211,34 @@ class UVLayerList_OT_SwitchMap(Operator):
     def execute(self, context):
         if self.index != context.scene.uvkit_uv_list_index:
             context.scene.uvkit_uv_list_index = self.index
+        return{'FINISHED'}
+    
+class UVLayerList_OT_SelectObjectUsingUVmap(Operator):
+    '''Select objects which are using this uvmap'''
+
+    bl_idname = "uvkit_uv_list.select_objects_using_uvmap"
+    bl_label = "Selection objects using this uvmap"
+    
+    uv_layer_name: StringProperty(name="UVMap", description="", default="UVMap")
+
+    def execute(self, context):
+      
+        for obj in context.selected_objects:
+            if obj.type != 'MESH':
+                continue            
+            mesh = obj.data
+            uvs = mesh.uv_layers       
+
+            uv_map = uvs.get(self.uv_layer_name)
+        
+            obj.select_set(uv_map != None)
+
+            if uv_map:
+                uv_map.active = True
+
+        if len(context.selected_objects) > 0:
+            bpy.context.view_layer.objects.active = context.selected_objects[0]
+
         return{'FINISHED'}
 
 
@@ -483,8 +525,10 @@ class UVLayerList_OT_ListSort_A_to_Z (bpy.types.Operator):
 def load_handler(dummy):
     subscribe_msgbus(subscription_owner)
 
-prev_operator = 0
+prev_operator = None
 prev_selected_objects = set()
+
+@persistent
 def depsgraph_update_handler(scene):
     if  UVLayerProperties_isUpdating:
         return
@@ -560,7 +604,7 @@ def UVLayerProperties_Update(self, context):
     if  UVLayerProperties_isUpdating:
         return
 
-    #print(f"update uv name: {self.intial_name} to {self.name}" )
+    print(f"update uv name: {self.intial_name} to {self.name}" )
     for obj in bpy.context.selected_objects:
         if obj.type != 'MESH':
             continue
@@ -591,10 +635,10 @@ class UVLayerProperties(PropertyGroup):
         default="UVMap"        
         )
 
-    use_count: IntProperty(
+    use_count: StringProperty(
         name="Use count",
         description="Amount of objects using this uv layer name",
-        default=0)
+        default="")
     
     needs_sync: BoolProperty(
         name="Needs Sync",
@@ -613,6 +657,7 @@ classes = [
     UVLayerProperties,
     UVLayerList_OT_Update,
     UVLayerList_OT_SwitchMap,
+    UVLayerList_OT_SelectObjectUsingUVmap,
     UVLayerList_OT_NewMap,
     UVLayerList_OT_DeleteMap,
     UVLayerList_OT_SetMapRenderActive,
@@ -621,6 +666,7 @@ classes = [
     UVLayerList_OT_ListSort_A_to_Z,
     IMAGE_UL_UVKIT_UVLayerList,
     IMAGE_PT_UVKIT_UVLayersPanel,
+    IMAGE_MT_UVKIT_UVLayersMenu,
 ]
 
 def register():
