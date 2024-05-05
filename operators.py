@@ -658,7 +658,7 @@ ALT   - set the Cursor"""
                     elif self.direction == 'vertical':
                         loop[uv_layer].uv.x = global_bbox.get_location(self.direction).x
 
-        bmesh.update_edit_mesh(part.mesh)
+            bmesh.update_edit_mesh(part.mesh)
         return {"FINISHED"}
   
 
@@ -685,15 +685,15 @@ class UV_OT_uvkit_rotate_shell(bpy.types.Operator):
     bl_idname = "view2d.uvkit_rotate_shell"
     bl_label = "Rotate 90 degrees"
     bl_options = {'REGISTER', 'UNDO'}
-    bl_description = """Rotate the selected UV island 90 degrees left or right
-
-CTRL - use Bounding Box Center.
-ALT  - use Cursor
-"""
+    bl_description = """Rotate the selected UVs 90 degrees left or right
+SHIFT - rotate Island
+CTRL - rotate around Bounding Box Center.
+ALT  - rotate around 2D Cursor"""
     
-    angle : bpy.props.FloatProperty(name="Angle")
-    use_boundingbox: bpy.props.BoolProperty(name="Use Boundingbox Center", default=False)
+    angle: bpy.props.FloatProperty(name="Angle", subtype='ANGLE')
+    use_individual_origin: bpy.props.BoolProperty(name="Use Boundingbox Center", default=False)
     use_cursor: bpy.props.BoolProperty(name="Use Cursor", default=False)
+    use_island: bpy.props.BoolProperty(name="Use Island", default=False)
 
     @classmethod
     def poll(cls, context):
@@ -720,61 +720,71 @@ ALT  - use Cursor
                 self.uv_layer = None
                 self.selected = []
 
-        # store selected uv loops
-        parts = []    
-        for obj in context.selected_objects:
-            if obj.mode != "EDIT" or obj.type != "MESH":
-                continue
-
-            bm = bmesh.from_edit_mesh(obj.data)
-            uv_layer = bm.loops.layers.uv.verify()
-            
-            part = Part()
-            part.mesh = obj.data
-            part.bm = bm
-            part.uv_layer = uv_layer
-            part.selected = get_selected_uv_vert_loops(bm, uv_layer)
-            parts.append(part)
-
         # remember initial pivot point setting
         intial_pivot_point = context.space_data.pivot_point 
 
-        context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+        context.space_data.pivot_point = "CENTER"
         if self.use_cursor:
             context.space_data.pivot_point = 'CURSOR'
-        elif self.use_boundingbox:
-            context.space_data.pivot_point = 'CENTER'    
+        elif self.use_individual_origin:
+            context.space_data.pivot_point = 'INDIVIDUAL_ORIGINS'
+               
 
-        bpy.ops.uv.select_linked()
+        # store selected uv loops
+        parts = []    
+        if self.use_island:
+            for obj in context.selected_objects:
+                if obj.mode != "EDIT" or obj.type != "MESH":
+                    continue
+
+                bm = bmesh.from_edit_mesh(obj.data)
+                uv_layer = bm.loops.layers.uv.verify()
+                
+                part = Part()
+                part.mesh = obj.data
+                part.bm = bm
+                part.uv_layer = uv_layer
+                part.selected = get_selected_uv_vert_loops(bm, uv_layer)
+                parts.append(part)
+
+            bpy.ops.uv.select_linked()
+
         bpy.ops.transform.rotate(value=self.angle, orient_axis='Z', constraint_axis=(False, False, False), use_proportional_edit=False)
-        bpy.ops.uv.select_all(action='DESELECT')
-
+        
         context.space_data.pivot_point = intial_pivot_point 
 
-        # regenerate the selection state
-        for part in parts:
-            bm = part.bm
-            uv_layer = part.uv_layer
-            for loop in part.selected:
-                loop[uv_layer].select = True
-           
-            bmesh.update_edit_mesh(part.mesh)
+        if self.use_island:
+            bpy.ops.uv.select_all(action='DESELECT')
 
-        # flush selection... bit ugly..
-        uv_selection_mode = context.tool_settings.uv_select_mode        
-        bpy.ops.uv.select_mode(type='VERTEX')
-        bpy.ops.uv.select_mode(type=uv_selection_mode)
+            # regenerate the selection state
+            for part in parts:
+                bm = part.bm
+                uv_layer = part.uv_layer
+                for loop in part.selected:
+                    loop[uv_layer].select = True
+            
+                bmesh.update_edit_mesh(part.mesh)
+
+            # flush selection... bit ugly..
+            uv_selection_mode = context.tool_settings.uv_select_mode        
+            bpy.ops.uv.select_mode(type='VERTEX')
+            bpy.ops.uv.select_mode(type=uv_selection_mode)
 
         return {'FINISHED'}
 
     def invoke(self, context: Context, event: Event):
-        self.use_boundingbox = False
+
+        self.use_individual_origin = False
         self.use_cursor = False
+        self.use_island = False
 
         if event.ctrl:
-            self.use_boundingbox = True
+            self.use_individual_origin = True
         elif event.alt:
             self.use_cursor = True
+        
+        if event.shift:
+            self.use_island = True      
 
         return self.execute(context)
 

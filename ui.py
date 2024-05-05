@@ -15,6 +15,7 @@ from bpy.types import (Operator,
                        UIList)
 
 
+#region UI
 
 class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
     # heavily copied from Reinier Goijvaerts
@@ -22,6 +23,9 @@ class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
     bl_label = "Textures from material"
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
+
+    #def poll(self, context):
+    #    return context.active_object.active_material != None
 
     def draw(self, context):
         layout = self.layout              
@@ -32,15 +36,22 @@ class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
         if obj.type == 'MESH' and obj.mode == 'EDIT':
             mesh = bmesh.from_edit_mesh(obj.data)
             material_indices = [face.material_index for face in mesh.faces if face.select]
-            for index in material_indices:
-                mat = obj.material_slots[index].material
-                if mat.use_nodes and mat not in materials:
-                    materials.append(mat)
+
+            if len(material_indices) and len(obj.material_slots):
+                for index in material_indices:
+                    slot = obj.material_slots[index]
+                    if not slot.material:
+                        continue
+
+                    mat = slot.material
+                    if mat.use_nodes and mat not in materials:
+                        materials.append(mat)
         else:
             active_mat = bpy.context.active_object.active_material
-            if active_mat.use_nodes:
+            if active_mat and active_mat.use_nodes:
                 materials.append(active_mat)
-
+        
+        texture_usage_found = False
         for mat in materials:   
             if not mat:
                 continue
@@ -51,10 +62,13 @@ class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
 
                 if not node.image:
                     continue
-              
+                
+                texture_usage_found = True
                 button = layout.operator("view2d.uvkit_show_image", text=node.image.name, icon_value=layout.icon(node.image))
                 button.image_name = node.image.name
 
+        if not texture_usage_found:
+            layout.label(text='No textures used')
 
 class IMAGE_PT_uvkit_main(Panel):
     bl_idname = "IMAGE_PT_uvkit_main"
@@ -104,7 +118,7 @@ class IMAGE_PT_uvkit_main(Panel):
 
         row = box.row(align=True)
         row.operator("view2d.uvkit_rotate_shell", text="Turn Left").angle = -math.pi / 2
-        row.operator("view2d.uvkit_rotate_shell", text="Turn Right").angle = -math.pi / 2
+        row.operator("view2d.uvkit_rotate_shell", text="Turn Right").angle = math.pi / 2
 
         box = layout.box()
         box.label(text="UV edgeloop tools")
@@ -159,16 +173,19 @@ class IMAGE_MT_uvkit_align_PIE(bpy.types.Menu):
         pie.operator("view2d.uvkit_align", text="Top Right").direction = "topright"
         pie.operator("view2d.uvkit_align", text="Bottom Left").direction = "bottomleft"
         pie.operator("view2d.uvkit_align", text="Bottom Right").direction = "bottomright"
-       
 
-# -------------------------------------------------------------------
-#   Register & Unregister
-# -------------------------------------------------------------------
+
+def uvcontext_menu_draw_func(self, context):
+    layout = self.layout
+    layout.separator()
+    layout.menu(IMAGE_MT_uvkit_imageList.bl_idname)
+        
+#endregion UI
+#region REGISTER / UNREGISTER
 
 classes = [
-    #ui panels
     IMAGE_PT_uvkit_main,
-    IMAGE_PT_uvkit_imageList,
+    IMAGE_MT_uvkit_imageList,
     IMAGE_MT_uvkit_align_PIE,
 ]
 
@@ -183,8 +200,10 @@ def register():
         keymap = wm.keyconfigs.addon.keymaps.new(name='UV Editor', space_type='EMPTY', region_type="WINDOW")
 
         keymap_item = keymap.keymap_items.new("wm.call_menu_pie", type="NONE", value='PRESS', ctrl=False)
-        keymap_item.properties.name = "IMAGE_MT_uvkit_align_pie"         
+        keymap_item.properties.name = IMAGE_MT_uvkit_align_PIE.bl_idname  
         addon_keymaps.append((keymap, keymap_item))
+
+    bpy.types.IMAGE_MT_uvs_context_menu.append(uvcontext_menu_draw_func)
 
 
 def unregister():
@@ -194,5 +213,7 @@ def unregister():
 
     for c in reversed(classes):
         bpy.utils.unregister_class(c)
-
     
+    bpy.types.IMAGE_MT_uvs_context_menu.remove(uvcontext_menu_draw_func)
+
+#endregion REGISTER / UNREGISTER
