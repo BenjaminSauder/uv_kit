@@ -2,7 +2,7 @@ bl_info = {
     "name": "UV Kit",
     "author": "Benjamin Sauder",
     "version": (1, 0),
-    "blender": (3, 4, 1),
+    "blender": (4, 0, 0),
     "location": "UV/Image editor > Tool Panel, UV/Image editor UVs > menu",
     "description": "Some quality of life improvements to uv editing",
     "warning": "",
@@ -16,6 +16,7 @@ import importlib
 modules = (
     ".operators",
     ".ui",
+    ".uv_layers",
 )
 
 
@@ -36,10 +37,12 @@ reimport_modules()
 
 from . import operators
 from . import ui
+from . import uv_layers
 
 register_modules = [
     operators,
     ui,
+    uv_layers,
 ]
 
 

@@ -16,10 +16,10 @@ from bpy.types import (Operator,
 
 
 
-class IMAGE_PT_uvkit_imageList(bpy.types.Menu):
+class IMAGE_MT_uvkit_imageList(bpy.types.Menu):
     # heavily copied from Reinier Goijvaerts
-    bl_idname = "uvkit_imageList"
-    bl_label = "Images from material"
+    bl_idname = "IMAGE_MT_uvkit_imageList"
+    bl_label = "Textures from material"
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
 
@@ -57,7 +57,7 @@ class IMAGE_PT_uvkit_imageList(bpy.types.Menu):
 
 
 class IMAGE_PT_uvkit_main(Panel):
-    bl_idname = "UVKIT_PT_main"
+    bl_idname = "IMAGE_PT_uvkit_main"
     bl_label = "UV kit"
     bl_space_type = 'IMAGE_EDITOR'   
     bl_region_type = 'UI'
@@ -73,22 +73,10 @@ class IMAGE_PT_uvkit_main(Panel):
             col.separator()
             col.operator("script.reload", text="Reload  Scripts", icon="NONE")
 
-        layout.menu("uvkit_imageList")
+        layout.menu(IMAGE_MT_uvkit_imageList.bl_idname)
         
         if not show_uvedit:
-            return
-
-        mesh = context.edit_object.data
-
-        # box = layout.box()
-        # row = box.row()
-        # col = row.column()
-
-        layout.prop_search(mesh.uv_layers, "active", mesh, "uv_layers", text="")
-       
-        # row.operator("mesh.uv_texture_add", icon='ADD', text="")
-        # row.operator("mesh.uv_texture_remove", icon='REMOVE', text="")
-
+            return  
 
         box = layout.box()	
         box.label(text="UV and Cursor align")
