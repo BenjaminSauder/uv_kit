@@ -2,6 +2,7 @@ import bpy
 from bpy.app.handlers import persistent
 from bpy.props import StringProperty, IntProperty, BoolProperty, CollectionProperty
 from bpy.types import PropertyGroup, UIList, Operator, Panel
+import bmesh
 
 #region UI
 
@@ -18,7 +19,7 @@ class IMAGE_UL_UVKIT_UVLayerList(UIList):
             row_main.prop(item, "name", text="", emboss=False)
             return
 
-        split = row_main.split(factor=0.5, align=True)
+        split = row_main.split(align=False)
         split.prop(item, "name", text="", emboss=False)
         
         row = split.row()
@@ -28,8 +29,7 @@ class IMAGE_UL_UVKIT_UVLayerList(UIList):
             op.mode = "Sync"            
         else:
             row.label(text="")
-
-        row = split.row()
+        
         op = row.operator(UVLayerList_OT_SelectObjectUsingUVmap.bl_idname, text=item.use_count)
         op.uv_layer_name = item.name
 
@@ -54,6 +54,7 @@ class IMAGE_PT_UVKIT_UVLayersPanel(Panel):
                     can_move_layers = False
                     break
       
+        
         if len(context.selected_objects) > 1 and not can_move_layers:
             row = layout.row()                      
             row.label(text="UV map order not synchronised!", icon="ERROR")
@@ -74,24 +75,33 @@ class IMAGE_PT_UVKIT_UVLayersPanel(Panel):
 
             box.label()
                     
+        if not scene.uvkit_uv_list or len(scene.uvkit_uv_list) == 0:
+            return
+         
         row = layout.row()
         row.operator(UVLayerList_OT_ListUp.bl_idname, text='Up', icon='TRIA_UP')    
         row.operator(UVLayerList_OT_ListDown.bl_idname, text='Down', icon='TRIA_DOWN')
         row.enabled = can_move_layers
 
+        current_uv_map_name = context.scene.uvkit_uv_list[context.scene.uvkit_uv_list_index].name
         row = layout.row()
         op = row.operator(UVLayerList_OT_NewMap.bl_idname, text='Copy', icon='EDITMODE_HLT')
-        op.uv_layer_name = item.name
+        op.uv_layer_name = current_uv_map_name
         op.mode = "Duplicate"
 
         op = row.operator(UVLayerList_OT_DeleteMap.bl_idname, text='Delete', icon='TRASH')
-        op.uv_layer_name = item.name
+        op.uv_layer_name = current_uv_map_name
 
         row = layout.row() 
         row.operator(UVLayerList_OT_ListSort_A_to_Z.bl_idname, text='Sort A-Z', icon='SORTALPHA')
 
         op = row.operator(UVLayerList_OT_SetMapRenderActive.bl_idname, text='Set Render Active', icon='RESTRICT_RENDER_OFF')
-        op.uv_layer_name = item.name
+        op.uv_layer_name = current_uv_map_name
+
+        row = layout.row()
+        op = row.operator(UVLayerList_OT_Copy_UVs.bl_idname, text='Copy UV faces', icon='RENDERLAYERS')
+        op.source = scene.uvkit_uv_list[scene.uvkit_uv_list_index].name
+        
 
 class IMAGE_MT_UVKIT_UVLayersMenu(bpy.types.Menu):
   
@@ -144,17 +154,15 @@ class UVLayerList_OT_Update(Operator):
         uv_layer_names = []
         unique_uv_layer_names = []
         name_counts = []
+
         mesh_count = 0
         for obj in context.selected_objects:
             if obj.type != 'MESH':
                 continue
             mesh_count += 1
 
-            uv_layer_names_for_obj = []
             mesh = obj.data
             for uv_map in mesh.uv_layers:
-                uv_layer_names_for_obj.append(uv_map.name)
-
                 if uv_map.name in unique_uv_layer_names:
                     index = unique_uv_layer_names.index(uv_map.name)
                     value = name_counts[index]
@@ -163,7 +171,7 @@ class UVLayerList_OT_Update(Operator):
                     unique_uv_layer_names.append(uv_map.name)
                     name_counts.append(1)
 
-            uv_layer_names.append(uv_layer_names_for_obj)
+            uv_layer_names.append(mesh.uv_layers.keys())
             
         # check if the order of the names is always the same
         order_mismatch = False
@@ -213,6 +221,7 @@ class UVLayerList_OT_SwitchMap(Operator):
             context.scene.uvkit_uv_list_index = self.index
         return{'FINISHED'}
     
+
 class UVLayerList_OT_SelectObjectUsingUVmap(Operator):
     '''Select objects which are using this uvmap'''
 
@@ -229,12 +238,11 @@ class UVLayerList_OT_SelectObjectUsingUVmap(Operator):
             mesh = obj.data
             uvs = mesh.uv_layers       
 
-            uv_map = uvs.get(self.uv_layer_name)
-        
-            obj.select_set(uv_map != None)
+            uv_layer = uvs.get(self.uv_layer_name)
+            if uv_layer:
+                uv_layer.active = True
 
-            if uv_map:
-                uv_map.active = True
+            obj.select_set(uv_layer != None)
 
         if len(context.selected_objects) > 0:
             bpy.context.view_layer.objects.active = context.selected_objects[0]
@@ -365,7 +373,6 @@ class UVLayerList_OT_SetMapRenderActive(Operator):
                uv_layer.active_render = True
 
         return{'FINISHED'}
-
 
 
 # see: https://blender.stackexchange.com/questions/67266/changing-order-of-uv-maps
@@ -518,6 +525,86 @@ class UVLayerList_OT_ListSort_A_to_Z (bpy.types.Operator):
         bpy.ops.uvkit.uv_list_update()  
         return {"FINISHED"}
     
+ 
+
+def get_uvkit_maps():
+    items = None
+    def func(self, context):
+        try:
+            items = [(uv_map.name, uv_map.name, "") for uv_map in bpy.context.scene.uvkit_uv_list]
+            return items
+        except Exception as e:
+            return items
+    return func
+    
+class UVLayerList_OT_Copy_UVs(bpy.types.Operator):
+    """Copy selected UV faces"""
+    bl_idname = "view2d.uvkit_copy_uvs"
+    bl_label = "Copy selected uv faces from one uv map to another"
+    bl_options = {"UNDO"}
+        
+    source: bpy.props.EnumProperty(name='Source', items=get_uvkit_maps())
+    destination: bpy.props.EnumProperty(name='Destination', items=get_uvkit_maps())
+
+    def draw(self, context: bpy.types.Context):
+        layout = self.layout
+        layout.use_property_split = True        
+       
+        layout.prop(self, 'destination')
+
+    def invoke(self, context: bpy.types.Context, event: bpy.types.Event):
+        wm = context.window_manager
+        return wm.invoke_props_dialog(self)
+
+    @classmethod
+    def poll(cls, context):
+        if not bpy.context.active_object:
+            return False
+        if bpy.context.active_object.type != 'MESH':
+            return False
+        if bpy.context.active_object.mode != 'EDIT':
+            return False
+        if not bpy.context.object.data.uv_layers:
+            return False
+        if bpy.context.scene.tool_settings.use_uv_select_sync:
+            return False
+        return True
+
+    def execute(self, context):        
+        for obj in context.selected_objects:
+            if obj.type != 'MESH':
+                continue
+            
+            bm = bmesh.from_edit_mesh(obj.data)
+            bm.faces.ensure_lookup_table()
+
+            uv_source = bm.loops.layers.uv.get(self.source)
+            uv_destination = bm.loops.layers.uv.get(self.destination)
+
+            for face in bm.faces:
+                if not face.select:
+                    continue
+                skip = False
+                for loop in face.loops:
+                    if not loop[uv_source].select:
+                        skip = True
+                        break
+                if skip:
+                    continue
+
+                for loop in face.loops:
+                    loop[uv_destination].uv.x = loop[uv_source].uv.x
+                    loop[uv_destination].uv.y = loop[uv_source].uv.y
+
+            bmesh.update_edit_mesh(obj.data)
+        
+        for index, uv_layer in enumerate(context.scene.uvkit_uv_list):
+            if uv_layer.name == self.destination:
+                context.scene.uvkit_uv_list_index = index                
+                break
+
+        return {'FINISHED'}
+    
 #endregion OPERATORS
 #region CALLBACKS
 
@@ -592,11 +679,10 @@ def listIndex_update_handler(self, context):
             continue
         
         mesh = obj.data
-        for uv_map in mesh.uv_layers:
-            if uv_map.name == uv_properties.name:
-                uv_map.active = True
-                break
-
+        uv_layer = mesh.uv_layers.get(uv_properties.name)
+        if uv_layer: 
+            uv_layer.active = True
+        
 
 UVLayerProperties_isUpdating = False
 def UVLayerProperties_Update(self, context):
@@ -613,9 +699,11 @@ def UVLayerProperties_Update(self, context):
         uvs = mesh.uv_layers
 
         uv_layer = uvs.get(self.intial_name)
-        if uv_layer: uv_layer.name = self.name
+        if uv_layer: 
+            uv_layer.name = self.name
 
     bpy.ops.uvkit.uv_list_update()
+
 
 #endregion CALLBACKS
 #region DATA
@@ -664,6 +752,7 @@ classes = [
     UVLayerList_OT_ListUp,
     UVLayerList_OT_ListDown,
     UVLayerList_OT_ListSort_A_to_Z,
+    UVLayerList_OT_Copy_UVs,
     IMAGE_UL_UVKIT_UVLayerList,
     IMAGE_PT_UVKIT_UVLayersPanel,
     IMAGE_MT_UVKIT_UVLayersMenu,
