@@ -686,8 +686,8 @@ class UV_OT_uvkit_rotate_shell(bpy.types.Operator):
     bl_label = "Rotate 90 degrees"
     bl_options = {'REGISTER', 'UNDO'}
     bl_description = """Rotate the selected UVs 90 degrees left or right
-SHIFT - rotate Island
-CTRL - rotate around Bounding Box Center.
+SHIFT - rotate Island.
+CTRL - rotate around individual origins.
 ALT  - rotate around 2D Cursor"""
     
     angle: bpy.props.FloatProperty(name="Angle", subtype='ANGLE')
