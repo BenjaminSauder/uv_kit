@@ -495,7 +495,152 @@ ALT   - ignore seams and pins"""
 
         self.execute(context)
         return {"FINISHED"}
-    
+
+from math import radians
+from bpy_extras.object_utils import object_data_add
+
+class UV_OT_uvkit_trim_unwrap(bpy.types.Operator):
+    bl_idname = "view2d.uvkit_trim_unwrap"
+    bl_label = "uvkit trim unwrap"
+    bl_options = {"REGISTER", "UNDO"}
+    bl_description = """
+"""
+
+    @classmethod
+    def poll(cls, context):
+        return is_uv_edit_mode()
+
+    def execute(self, context):
+        from .bpypolyskel.bpyeuclid import Edge2
+        from .bpypolyskel.bpypolyskel import skeletonize
+
+        for object_original in context.selected_objects:
+            if object_original.mode != "EDIT" and obj.type != "MESH":
+                continue
+
+            bpy.context.view_layer.objects.active = object_original
+
+            # make working copy
+            bpy.ops.object.editmode_toggle()
+            bpy.ops.object.duplicate()
+            #bpy.ops.object.editmode_toggle()
+           
+            deform_source = bpy.context.view_layer.objects.active
+            deform_source.name = "DeformSource" 
+            deform_source.modifiers.clear()
+            deform_mesh = deform_source.data
+            bm = bmesh.new()
+            bm.from_mesh(deform_mesh)
+
+            #region Preprocess
+            
+            # delete unselected faces
+            unselected_faces = []
+            for face in bm.faces:
+                if not face.select:
+                    unselected_faces.append(face)                
+
+            bmesh.ops.delete(bm, geom=unselected_faces, context='FACES')  
+
+            # unwrap and get rid of inner edges
+            # should result in one big polygon
+            seams = []
+            inner_edges = []
+            for edge in bm.edges:
+                if edge.seam:
+                    seams.append(edge)
+
+                if not edge.is_boundary and not edge.seam:
+                    inner_edges.append(edge)
+
+            bmesh.ops.split_edges(bm, edges=seams)         
+            bm.to_mesh(deform_mesh)
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.uv.unwrap(method='ANGLE_BASED', margin=0.01)
+            bpy.ops.object.mode_set(mode='OBJECT')
+
+            pre_processed_bm = bm.copy()
+            deform_target_mesh = bpy.data.meshes.new(name="DeformTargetMesh")
+            deform_target_obj = object_data_add(context, deform_target_mesh, name='DeformTarget')
+
+            uv_layer = pre_processed_bm.loops.layers.uv.verify()
+            for face in pre_processed_bm.faces:
+                for loop in face.loops:
+                    loop.vert.co = loop[uv_layer].uv.to_3d()
+
+        
+            pre_processed_bm.to_mesh(deform_target_mesh)
+        
+            #endregion Preprocess
+
+            #region Skeleton
+            bmesh.ops.dissolve_edges(bm, edges=inner_edges)
+
+            bm.faces.ensure_lookup_table()
+            bm.verts.ensure_lookup_table()
+
+            # bmesh will keep extra edges and thus faces if it has to maintain a hole
+            uv_shell_has_hole = len(bm.faces) > 1
+            if uv_shell_has_hole:
+                print("hole detected")
+                continue
+            
+            uv_layer = bm.loops.layers.uv.verify()
+            for face in bm.faces:
+                for loop in face.loops:
+                    loop.vert.co = loop[uv_layer].uv.to_3d()
+            
+            bmesh.ops.dissolve_limit(bm, angle_limit=radians(10.0), edges=bm.edges)
+
+            min_edge_length = 10000000000
+            for edge in bm.edges:
+                min_edge_length = min(min_edge_length, (edge.verts[0].co - edge.verts[1].co).length)
+
+
+            contour_verts = []
+            edges = []
+            for loop in bm.faces[0].loops:
+                edges.append(Edge2(loop.vert.co, loop.link_loop_next.vert.co))
+                contour_verts.append(loop.vert.co)
+
+            edge_contours = [edges]
+            skeleton = skeletonize(edge_contours)
+
+            bmesh.ops.delete(bm, geom=bm.faces, context='FACES')
+
+            skeleton_positions = []
+            verts = []
+            for subtree in skeleton:
+                vert1 = bm.verts.new(subtree.source.to_3d())                
+                verts.append(vert1)
+                skeleton_positions.append(subtree.source)
+
+                for link in subtree.sinks:
+                    vert2 = bm.verts.new(link.to_3d())
+                    e = bm.edges.new((vert1, vert2))
+
+            # for index_A, subtree in enumerate(skeleton):
+            #     for link in subtree.sinks:
+            #         for index_B, position in enumerate(skeleton_positions):
+            #             if (position - link).length < 0.001:
+            #                 vert1 = verts[index_A]
+            #                 vert2 = verts[index_B] 
+            #                 e = bm.edges.new((vert1, vert2))
+
+            bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=min_edge_length*0.99)
+            
+            bm.to_mesh(deform_mesh)
+
+            #endregion Skeleton
+
+            #mod = deform_target_obj.modifiers.new("Surface Deform", type='SURFACE_DEFORM')
+            #mod.target = deform_source
+
+        return {"FINISHED"}
+
+    def invoke(self, context, event):
+        self.execute(context)
+        return {"FINISHED"}   
 
 class UV_OT_uvkit_show_image(bpy.types.Operator):
     # heavily copied from Reinier Goijvaerts
@@ -800,6 +945,7 @@ classes = [
     UV_OT_uvkit_select_uv_edgeloop,
     UV_OT_uvkit_align_uv_edgeloops,
     UV_OT_uvkit_constrained_unwrap,
+    UV_OT_uvkit_trim_unwrap,
     UV_OT_uvkit_show_image,
     UV_OT_uvkit_align,
     UV_OT_uvkit_rotate_shell,

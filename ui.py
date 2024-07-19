@@ -157,6 +157,8 @@ class IMAGE_PT_uvkit_main(Panel):
         
         col.operator("view2d.uvkit_constrained_unwrap", text="Constrained Unwrap")
         col.enabled = show_uvedit
+        #col.operator("view2d.uvkit_trim_unwrap", text="Trim Unwrap")
+        #col.enabled = show_uvedit
 
 class IMAGE_MT_uvkit_align_PIE(bpy.types.Menu):
     bl_label = 'UV kit Align'

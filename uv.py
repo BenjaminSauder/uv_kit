@@ -35,6 +35,24 @@ def get_uv_valence(loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem) ->
 
     return valence
 
+def get_uv_valence_selected(loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem) -> int:
+    '''number of edges branching out from a uv vert'''
+    uv = loop[uv_layer].uv
+
+    valence = 0
+    for loop in loop.vert.link_loops:
+        if not loop.face.select:
+            continue
+        
+        if loop.edge.seam:
+            continue
+
+        if is_same_uv_location(uv, loop[uv_layer].uv):
+            valence += 1
+
+    return valence
+
+
 
 def get_selected_uv_edge_loops(bm: bmesh.types.BMesh, uv_layer:bmesh.types.BMLayerItem) -> List[bmesh.types.BMLoop]:
     '''collect selected uv loops which have selected uv edges'''
@@ -463,9 +481,12 @@ def select_uv_edgeloop(uv_edgeloop:List[bmesh.types.BMLoop], uv_layer:bmesh.type
                 connected_uv.select = True
 
 
-
 def find_uv_islands_for_selected_uv_loops(bm:bmesh.types.BMesh, uv_layer:bmesh.types.BMLayerItem) -> List[List[bmesh.types.BMLoop]]:
-    '''returns a list of uv islands which are searched from the initial loops - uv islands are unordered lists of uv loops'''
+    '''returns a list of uv islands which are searched from the initial loops - uv islands are unordered lists of uv loops'''    
+    return find_uv_islands_for_selected_faces(bm, uv_layer, filter_selected=True)
+
+def find_uv_islands_for_selected_faces(bm:bmesh.types.BMesh, uv_layer:bmesh.types.BMLayerItem, filter_selected:bool=False) -> List[List[bmesh.types.BMLoop]]:
+    '''returns a list of uv islands from selected faces - uv islands are unordered lists of uv loops'''
 
     # https://blender.stackexchange.com/questions/48827/how-to-get-lists-of-uv-island-from-python-script
     from collections import defaultdict
@@ -516,8 +537,12 @@ def find_uv_islands_for_selected_uv_loops(bm:bmesh.types.BMesh, uv_layer:bmesh.t
 
     result: List[bmesh.types.BMLoop] = []
     for island in uv_island_lists:        
-        if island.selected:
+        if filter_selected:
+            if island.selected:
+                result.append(list(island.verts))
+        else: 
             result.append(list(island.verts))
+
     return result
     
     

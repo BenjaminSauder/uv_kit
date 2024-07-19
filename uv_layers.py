@@ -672,6 +672,12 @@ def unsubscribe_msgbus(subscription_owner):
 
 
 def listIndex_update_handler(self, context):
+    if not context.scene.uvkit_uv_list:
+        return
+
+    if context.scene.uvkit_uv_list_index < 0 or context.scene.uvkit_uv_list_index > len(context.scene.uvkit_uv_list):
+        return
+
     uv_properties = context.scene.uvkit_uv_list[context.scene.uvkit_uv_list_index]
 
     for obj in bpy.context.selected_objects:
