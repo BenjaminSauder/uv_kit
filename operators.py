@@ -414,38 +414,29 @@ ALT   - ignore seams and pins"""
 
                 pinned_uvs = set()
                 seam_edges = set()
+                selected_uv_edges = set()
 
                 for island in uv_islands:
                     for loop in island:
-                        for connected in loop.face.loops:
-                            connected.uv_select_vert = True
-                            connected.uv_select_edge = False
+                        if loop.uv_select_edge:
+                            selected_uv_edges.add(loop)
 
-                            if self.ignore_pins:
-                                if connected[uv_layer].pin_uv:
-                                    pinned_uvs.add(connected)
-                                connected[uv_layer].pin_uv = False
+                        loop.uv_select_vert = True
+                        loop.uv_select_edge = True
 
-                            if self.ignore_seams:
-                                if connected.edge.seam:
-                                    seam_edges.add(connected.edge)
-                                connected.edge.seam = False
+                        if self.ignore_pins:
+                            if loop[uv_layer].pin_uv:
+                                pinned_uvs.add(loop)
+                            loop[uv_layer].pin_uv = False
+
+                        if self.ignore_seams:
+                            if loop.edge.seam:
+                                seam_edges.add(loop.edge)
+                            loop.edge.seam = False
 
                 for selected_uv_loop in selected_uv_loops:
                     selected_uv_loop.uv_select_vert = False
-
-                    if selected_uv_loop[uv_layer].pin_uv:
-                        pinned_uvs.add(selected_uv_loop)
-                    selected_uv_loop[uv_layer].pin_uv = True
-                    
-                    for connected in selected_uv_loop.vert.link_loops:
-                        if connected.face.select:
-                            connected.uv_select_vert = False
-
-                            if connected[uv_layer].pin_uv:
-                                pinned_uvs.add(connected)
-                            connected[uv_layer].pin_uv = True
-
+                 
                 if self.mode == "ANGLE_BASED":
                     bpy.ops.uv.unwrap(method="ANGLE_BASED")
                 elif self.mode == "CONFORMAL":
@@ -459,16 +450,15 @@ ALT   - ignore seams and pins"""
 
                 for edge in seam_edges:
                     edge.seam = True
+                
+                for pinned_uv in pinned_uvs:
+                    pinned_uv[uv_layer].pin_uv = True
 
                 for selected_uv_loop in selected_uv_loops:
                     selected_uv_loop.uv_select_vert = True
-                    selected_uv_loop[uv_layer].pin_uv = False
-                
-                for pinned_uv in pinned_uvs:
-                    pinned_uv[uv_layer].pin_uv = False
 
-                for selected_uv_loop in selected_uv_loops:
-                    selected_uv_loop.uv_select_edge = selected_uv_loop.link_loop_next.uv_select_vert
+                for loop in selected_uv_edges:
+                    loop.uv_select_edge = True
 
                 bmesh.update_edit_mesh(obj.data)
 
