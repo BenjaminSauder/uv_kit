@@ -945,7 +945,7 @@ classes = [
     UV_OT_uvkit_select_uv_edgeloop,
     UV_OT_uvkit_align_uv_edgeloops,
     UV_OT_uvkit_constrained_unwrap,
-    UV_OT_uvkit_trim_unwrap,
+    #UV_OT_uvkit_trim_unwrap,
     UV_OT_uvkit_show_image,
     UV_OT_uvkit_align,
     UV_OT_uvkit_rotate_shell,
