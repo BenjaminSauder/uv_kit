@@ -7,7 +7,8 @@ from typing import List, Dict, Union
 
 def str_loop(loop:bmesh.types.BMLoop) -> str:
     """more compact print of a bmloop"""
-    return f"{loop.vert.index}/{loop.edge.index}/{loop.face.index}"
+    #return f"{loop.vert.index}/{loop.edge.index}/{loop.face.index}"
+    return f"{loop.index}"
 
 
 def is_same_uv_location(a:mathutils.Vector, b:mathutils.Vector) -> bool:
@@ -264,7 +265,7 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
 
     """
 
-    print("next current: ", str_loop(start_loop))
+    print("F next current: ", str_loop(start_loop))
 
     m = start_loop
     n = m.link_loop_next
@@ -276,36 +277,41 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
     a = m.link_loop_radial_next
     f = a.link_loop_next
 
-    print(f"  n: {str_loop(n)}, o: {str_loop(o)}, p: {str_loop(p)}")
+    print(f"F  n: {str_loop(n)}, o: {str_loop(o)}, p: {str_loop(p)}")
 
     if constrain_by_selected and not p.uv_select_edge:
-        print(" not selected ")
+        print("F not selected ")
         return None
 
     if is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv) != is_same_uv_location(
         n[uv_layer].uv, a[uv_layer].uv
     ):
-        print(f" m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
+        print(f"F m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
         print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
-        print(" start verts uvs not in same state location - either both connected / split")
+        print("F start verts uvs not in same state location - either both connected / split")
         return None
 
     if n.edge.is_boundary:
-        print(" boundary - toplogical border")
+        print("F boundary - toplogical border")
         return None
     
-    if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(p, uv_layer):
+    # if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(p, uv_layer):
+    #     return None
+    
+    if link_loop_is_uv_connected(p, uv_layer):
         return None
 
     if not is_same_uv_location(n[uv_layer].uv, p[uv_layer].uv):
-        print(" connected vert uvs not same location")
+        print("F connected vert uvs not same location")
         return None
 
     if is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv) != is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv):
-        print(f" d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
+        print(f"F d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
         print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
-        print(" other side vert uvs not same location")
+        print("F other side vert uvs not same location")
         return None
+
+    
 
     return p
 
@@ -326,36 +332,39 @@ def find_uv_edgeloop_prev(start_loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BM
     p = d.link_loop_radial_next
     q = p.link_loop_next
 
-    print(f"  a: {str_loop(a)}, b: {str_loop(b)}, c: {str_loop(c)}")
+    print(f"R  a: {str_loop(a)}, b: {str_loop(b)}, c: {str_loop(c)}")
 
     if constrain_by_selected and not d.uv_select_edge:
-        print(" not selected ")
+        print("R not selected ")
         return None
 
     if is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv) != is_same_uv_location(
         n[uv_layer].uv, a[uv_layer].uv
     ):
-        print(f" m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
+        print(f"R m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
         print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
-        print(" start verts uvs not in same state location - either both connected / split")
+        print("R start verts uvs not in same state location - either both connected / split")
         return None
 
     if b.edge.is_boundary:
-        print(" boundary - toplogical border")
+        print("R boundary - toplogical border")
         return None
 
-    print(f"valence: {get_uv_valence(a, uv_layer)}")
-    if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(d, uv_layer):
-        return None
+    print(f"R valence: {get_uv_valence(a, uv_layer)}")
+    # if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(d, uv_layer):
+    #     return None
+
+    if link_loop_is_uv_connected(d, uv_layer):
+       return None
 
     if not is_same_uv_location(a[uv_layer].uv, c[uv_layer].uv):
-        print(" connected vert uvs not same location")
+        print("R connected vert uvs not same location")
         return None
 
     if is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv) != is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv):
-        print(f" d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
+        print(f"R d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
         print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
-        print(" other side vert uvs not same location")
+        print("R other side vert uvs not same location")
         return None
 
     return d
