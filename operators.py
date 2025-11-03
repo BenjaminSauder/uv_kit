@@ -46,8 +46,8 @@ def is_uv_edit_mode():
         return False
     if bpy.context.active_object.mode != 'EDIT':
         return False
-    if bpy.context.scene.tool_settings.use_uv_select_sync:
-        return False
+    #if bpy.context.scene.tool_settings.use_uv_select_sync:
+    #    return False
     return True
 
 
@@ -71,10 +71,11 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
                 uv_layer = bm.loops.layers.uv.verify()
 
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
+                print(selected_uv_loops)
                 
                 if self.mode == "CONTINUOS":
                     edge_loops = find_uv_edgeloops(selected_uv_loops, uv_layer)
-                    # print(f"number of edgeloops: {len(edge_loops)}")
+                    print(f"number of edgeloops: {len(edge_loops)}")
 
                     for edgeloop in edge_loops:
                         select_uv_edgeloop(edgeloop, uv_layer)
@@ -99,6 +100,10 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
 
                     for edgeloop in edge_loops:
                         shrink_uv_edgeloop(edgeloop, uv_layer)
+
+                
+                if(context.scene.tool_settings.use_uv_select_sync):
+                    bm.uv_select_sync_to_mesh()
 
                 bmesh.update_edit_mesh(obj.data)
 
@@ -139,6 +144,7 @@ class UV_OT_uvkit_select_uv_edgering(bpy.types.Operator):
                         select_uv_edgering(edge_ring, uv_layer)
 
                 elif self.mode == "EXPAND":
+                    #TODO does not work properly yet -> should expand left and right
                     edge_rings = find_uv_edgerings(
                         selected_uv_loops, uv_layer, constrain_by_selected=True
                     )
@@ -206,9 +212,7 @@ CTRL  - use global values"""
             uv_layer = bm.loops.layers.uv.verify()
 
             selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
-            edge_loops = find_uv_edgeloops(
-                selected_uv_loops, uv_layer, constrain_by_selected=True
-            )
+            edge_loops = find_uv_edgeloops(selected_uv_loops, uv_layer, constrain_by_selected=True)
 
             # add "other" vert from end
             for edge_loop in edge_loops:
@@ -247,9 +251,6 @@ CTRL  - use global values"""
                 connected_uv_verts = []
                 for loop in edge_loop:
                     for connected in loop.vert.link_loops:
-                        if not connected.face.select:
-                            continue
-
                         a = loop[uv_layer].uv
                         b = connected[uv_layer].uv
                         if is_same_uv_location(a, b):
@@ -319,9 +320,7 @@ class UV_OT_uvkit_spread_loop(bpy.types.Operator):
 
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
 
-                edge_loops = find_uv_edgeloops(
-                    selected_uv_loops, uv_layer, constrain_by_selected=True
-                )
+                edge_loops = find_uv_edgeloops( selected_uv_loops, uv_layer, constrain_by_selected=True)
                 # add "other" vert from end
                 for edge_loop in edge_loops:
                     edge_loop.append(edge_loop[-1].link_loop_next)
@@ -374,9 +373,6 @@ class UV_OT_uvkit_spread_loop(bpy.types.Operator):
                         b_pos = b_uv.uv.to_2d()
 
                         for connected in b.vert.link_loops:
-                            if not connected.face.select:
-                                continue
-
                             c_uv = connected[uv_layer]
                             if is_same_uv_location(c_uv.uv, b_pos):
                                 c_uv.uv = target_pos
@@ -422,11 +418,8 @@ ALT   - ignore seams and pins"""
                 for island in uv_islands:
                     for loop in island:
                         for connected in loop.face.loops:
-                            if not connected.face.select:
-                                continue
-
-                            connected[uv_layer].select = True
-                            connected[uv_layer].select_edge = False
+                            connected.uv_select_vert = True
+                            connected.uv_select_edge = False
 
                             if self.ignore_pins:
                                 if connected[uv_layer].pin_uv:
@@ -439,7 +432,7 @@ ALT   - ignore seams and pins"""
                                 connected.edge.seam = False
 
                 for selected_uv_loop in selected_uv_loops:
-                    selected_uv_loop[uv_layer].select = False
+                    selected_uv_loop.uv_select_vert = False
 
                     if selected_uv_loop[uv_layer].pin_uv:
                         pinned_uvs.add(selected_uv_loop)
@@ -447,7 +440,7 @@ ALT   - ignore seams and pins"""
                     
                     for connected in selected_uv_loop.vert.link_loops:
                         if connected.face.select:
-                            connected[uv_layer].select = False
+                            connected.uv_select_vert = False
 
                             if connected[uv_layer].pin_uv:
                                 pinned_uvs.add(connected)
@@ -461,21 +454,21 @@ ALT   - ignore seams and pins"""
                 for island in uv_islands:
                     for loop in island:
                         for connected in loop.face.loops:
-                            connected[uv_layer].select = False
-                            connected[uv_layer].select_edge = False
+                            connected.uv_select_vert = False
+                            connected.uv_select_edge = False
 
                 for edge in seam_edges:
                     edge.seam = True
 
                 for selected_uv_loop in selected_uv_loops:
-                    selected_uv_loop[uv_layer].select = True
+                    selected_uv_loop.uv_select_vert = True
                     selected_uv_loop[uv_layer].pin_uv = False
                 
                 for pinned_uv in pinned_uvs:
                     pinned_uv[uv_layer].pin_uv = False
 
                 for selected_uv_loop in selected_uv_loops:
-                    selected_uv_loop[uv_layer].select_edge = selected_uv_loop.link_loop_next[uv_layer].select
+                    selected_uv_loop.uv_select_edge = selected_uv_loop.link_loop_next.uv_select_vert
 
                 bmesh.update_edit_mesh(obj.data)
 
@@ -699,8 +692,8 @@ ALT   - set the Cursor"""
             bm = bmesh.from_edit_mesh(obj.data)
             uv_layer = bm.loops.layers.uv.verify()
 
-            selected_uv_loops = get_selected_uv_vert_loops(bm, uv_layer)
-
+            selected_uv_loops = get_selected_uv_vert_loops(bm, uv_layer)            
+          
             if not has_uv_selection and len(selected_uv_loops) > 0:
                 has_uv_selection  = True
 
@@ -708,7 +701,7 @@ ALT   - set the Cursor"""
             uv_islands_bounds: List[BBoxUV] = []
             if self.move_island:
                 uv_islands = find_uv_islands_for_selected_uv_loops(bm, uv_layer)       
-                print(f"islands: {len(uv_islands)}")
+                # print(f"islands: {len(uv_islands)}")
                 for island in uv_islands:
                     uv_islands_bounds.append(BBoxUV(island, uv_layer))
 
@@ -852,8 +845,7 @@ ALT  - rotate around 2D Cursor"""
             return False
         if not bpy.context.object.data.uv_layers:
             return False
-        if bpy.context.scene.tool_settings.use_uv_select_sync:
-            return False
+        
         return True
 
     def execute(self, context):
@@ -906,7 +898,7 @@ ALT  - rotate around 2D Cursor"""
                 bm = part.bm
                 uv_layer = part.uv_layer
                 for loop in part.selected:
-                    loop[uv_layer].select = True
+                    loop.uv_select_vert = True
             
                 bmesh.update_edit_mesh(part.mesh)
 
