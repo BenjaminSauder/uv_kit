@@ -20,7 +20,18 @@ def link_loop_is_uv_connected(loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLa
     '''see if the uv edge is split'''
     a = loop
     b = loop.link_loop_radial_next
-    use_same_locations = is_same_uv_location(a[uv_layer].uv, b.link_loop_next[uv_layer].uv) and is_same_uv_location(b[uv_layer].uv, a.link_loop_next[uv_layer].uv)
+
+    # print(a.index, b.index)
+
+    m = is_same_uv_location(a[uv_layer].uv, b.link_loop_next[uv_layer].uv)
+    n = is_same_uv_location(b[uv_layer].uv, a.link_loop_next[uv_layer].uv)
+    
+#     print(f'''
+#           m: {m} - {b.link_loop_next.index}, 
+#           n: {n} - {a.link_loop_next.index}
+# ''')
+
+    use_same_locations = m and n 
 
     return use_same_locations
 
@@ -81,7 +92,7 @@ def get_selected_uv_vert_loops(bm:bmesh.types.BMesh, uv_layer:bmesh.types.BMLaye
 
     return selected_uv_loops
 
-def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool=False) -> List[List[bmesh.types.BMLoop]]:
+def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.types.BMLayerItem, mode:str) -> List[List[bmesh.types.BMLoop]]:
     '''returns list of sorted uv edgerings based on supplied initial uv loops'''
 
     edge_rings = []
@@ -97,11 +108,15 @@ def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
         cylic_ring = False
         # print(f"start: {str_loop(start)}")
         while True:
-            next = find_uv_edgering_next(current, uv_layer, constrain_by_selected)
+            next = find_uv_edgering_next(current, uv_layer, mode)
+            #  print(f"current: {current.index} - found next: {next.index if next else None}")
             current = None
             if next:
                 # print(f"--- {str_loop(next)}")
 
+                #uv_connected = link_loop_is_uv_connected(next, uv_layer)
+                
+                # print(f"adding loop: {str_loop(next)}")
                 if forward:
                     edge_ring.append(next)
                 else:
@@ -110,18 +125,21 @@ def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
                 if next in uv_loops:
                     uv_loops.remove(next)
 
-                a = next
-                b = next.link_loop_radial_next
+               
+                candidate = next.link_loop_radial_next
 
                 # on a cylinder end meets the start loop again, need to stop there
-                if b == start.link_loop_radial_next or b == start:
+                if candidate == start.link_loop_radial_next or candidate == start:
                     cylic_ring = True
 
-                if (not cylic_ring and link_loop_is_uv_connected(a, uv_layer)):
-                    current = b
+                is_uv_connected = link_loop_is_uv_connected(candidate, uv_layer)
+
+                if (is_uv_connected and not cylic_ring):
+                    current = candidate
                     if current in uv_loops:
                         uv_loops.remove(current)
 
+                    # print(f"adding loop: {current.index}")
                     if forward:
                         edge_ring.append(current)
                     else:
@@ -133,10 +151,15 @@ def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
             # if no next loop is found - start looking reverse from the start loop
             if not current:
                 if forward and not start.edge.is_boundary:
+                    # print('reversing')
                     forward = False
 
                     if link_loop_is_uv_connected(start, uv_layer):
                         current = start.link_loop_radial_next
+
+                        edge_ring.insert(0, current)
+
+                        # print(f"adding loop: {current.index}")
                         if current in uv_loops:
                             uv_loops.remove(current)
                     else:
@@ -144,12 +167,16 @@ def find_uv_edgerings(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
                 else:
                     break
 
+        # for loop in edge_ring:
+        #     print(f"loop: {loop.index}")
+
         edge_rings.append(edge_ring)
 
+     
     return edge_rings
 
 
-def find_uv_edgering_next(a:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Union[None, bmesh.types.BMLoop]:
+def find_uv_edgering_next(a:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, mode:str, reverse=False) -> Union[None, bmesh.types.BMLoop]:
     '''returns the next loop from an uv edgering'''
 
     """
@@ -162,13 +189,25 @@ def find_uv_edgering_next(a:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem
     """
 
     # in a pure quad structure the next next edge is the other side of the quad
-    b = a.link_loop_next.link_loop_next
+    
+    if reverse:
+        b = a.link_loop_prev.link_loop_prev
+        is_quad = b.link_loop_prev.link_loop_prev == a
+    else:
+        b = a.link_loop_next.link_loop_next
+        is_quad = b.link_loop_next.link_loop_next == a
 
+    # print(b.index, mode, b.uv_select_edge, a.uv_select_edge)
     # so moving along the edges this must be the same as the start loop
-    if b.link_loop_next.link_loop_next == a:
-        if constrain_by_selected and not b.uv_select_edge:
-            return None
+    if is_quad:
+        if mode == 'EXPAND':
+            if (not b.uv_select_edge and not a.uv_select_edge):
+                return None
 
+        if mode == 'SHRINK':
+            if (not b.uv_select_edge or not a.uv_select_edge):
+                return None 
+            
         return b
     else:
         return None
@@ -195,7 +234,10 @@ def expand_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.type
 def shrink_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.types.BMLayerItem) -> None:
     '''shrinks the uv edgering by one edge'''
 
-    if len(uv_edgering) < 2:
+    for l in uv_edgering:
+        print(f"{l.index}")
+
+    if len(uv_edgering) < 4:
         return
 
     a = uv_edgering.pop(0)
@@ -206,9 +248,6 @@ def shrink_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.type
         a = uv_edgering.pop(0)
         a.uv_select_edge = False
         a.uv_select_vert = False
-
-    if len(uv_edgering) < 2:
-        return
 
     b = uv_edgering.pop(-1)
     b.uv_select_edge = False
@@ -265,7 +304,7 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
 
     """
 
-    print("F next current: ", str_loop(start_loop))
+    #print("F next current: ", str_loop(start_loop))
 
     m = start_loop
     n = m.link_loop_next
@@ -277,41 +316,40 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
     a = m.link_loop_radial_next
     f = a.link_loop_next
 
-    print(f"F  n: {str_loop(n)}, o: {str_loop(o)}, p: {str_loop(p)}")
+    #print(f"F  n: {str_loop(n)}, o: {str_loop(o)}, p: {str_loop(p)}")
 
     if constrain_by_selected and not p.uv_select_edge:
-        print("F not selected ")
+        #print("F not selected ")
         return None
 
     if is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv) != is_same_uv_location(
         n[uv_layer].uv, a[uv_layer].uv
     ):
-        print(f"F m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
-        print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
-        print("F start verts uvs not in same state location - either both connected / split")
+        #print(f"F m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
+        #print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
+        #print("F start verts uvs not in same state location - either both connected / split")
         return None
 
     if n.edge.is_boundary:
-        print("F boundary - toplogical border")
+        #print("F boundary - toplogical border")
         return None
     
-    # if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(p, uv_layer):
+    if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(p, uv_layer):
+        return None
+    
+    # if not link_loop_is_uv_connected(p, uv_layer):
+    #     #print("F uv edge split")
     #     return None
-    
-    if link_loop_is_uv_connected(p, uv_layer):
-        return None
 
     if not is_same_uv_location(n[uv_layer].uv, p[uv_layer].uv):
-        print("F connected vert uvs not same location")
+        #print("F connected vert uvs not same location")
         return None
 
     if is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv) != is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv):
-        print(f"F d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
-        print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
-        print("F other side vert uvs not same location")
+        #print(f"F d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
+        #print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
+        #print("F other side vert uvs not same location")
         return None
-
-    
 
     return p
 
@@ -319,7 +357,7 @@ def find_uv_edgeloop_next(start_loop, uv_layer:bmesh.types.BMLayerItem, constrai
 def find_uv_edgeloop_prev(start_loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BMLayerItem, constrain_by_selected:bool) -> Union[None, bmesh.types.BMLoop]:
     '''searches the previous loop of a uv edgeloop'''
 
-    print("prev current: ", str_loop(start_loop))
+    #print("prev current: ", str_loop(start_loop))
 
     a = start_loop
     b = start_loop.link_loop_prev
@@ -332,39 +370,40 @@ def find_uv_edgeloop_prev(start_loop:bmesh.types.BMLoop, uv_layer:bmesh.types.BM
     p = d.link_loop_radial_next
     q = p.link_loop_next
 
-    print(f"R  a: {str_loop(a)}, b: {str_loop(b)}, c: {str_loop(c)}")
+    #print(f"R  a: {str_loop(a)}, b: {str_loop(b)}, c: {str_loop(c)}")
 
     if constrain_by_selected and not d.uv_select_edge:
-        print("R not selected ")
+        #print("R not selected ")
         return None
 
     if is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv) != is_same_uv_location(
         n[uv_layer].uv, a[uv_layer].uv
     ):
-        print(f"R m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
-        print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
-        print("R start verts uvs not in same state location - either both connected / split")
+        #print(f"R m: {str_loop(m)}, f: {str_loop(f)} | n: {str_loop(n)}, a: {str_loop(a)}")
+        #print( is_same_uv_location(m[uv_layer].uv, f[uv_layer].uv), is_same_uv_location(n[uv_layer].uv, a[uv_layer].uv))
+        #print("R start verts uvs not in same state location - either both connected / split")
         return None
 
     if b.edge.is_boundary:
-        print("R boundary - toplogical border")
+        #print("R boundary - toplogical border")
         return None
 
-    print(f"R valence: {get_uv_valence(a, uv_layer)}")
-    # if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(d, uv_layer):
-    #     return None
+    #print(f"R valence: {get_uv_valence(a, uv_layer)}")
+    if get_uv_valence(n, uv_layer) != 4 and link_loop_is_uv_connected(d, uv_layer):
+        return None
 
-    if link_loop_is_uv_connected(d, uv_layer):
-       return None
+    # if not link_loop_is_uv_connected(d, uv_layer):
+    #    #print("R uv edge split")
+    #    return None
 
     if not is_same_uv_location(a[uv_layer].uv, c[uv_layer].uv):
-        print("R connected vert uvs not same location")
+        #print("R connected vert uvs not same location")
         return None
 
     if is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv) != is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv):
-        print(f"R d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
-        print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
-        print("R other side vert uvs not same location")
+        #print(f"R d: {str_loop(d)}, q: {str_loop(q)} | p: {str_loop(p)}, c: {str_loop(c)}")
+        #print( is_same_uv_location(d[uv_layer].uv, q[uv_layer].uv), is_same_uv_location(p[uv_layer].uv, c[uv_layer].uv))
+        #print("R other side vert uvs not same location")
         return None
 
     return d
@@ -380,21 +419,23 @@ def find_uv_edgeloops(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
         start_loop = uv_loops.pop()
         edge_loop = [start_loop]
 
-        # print("forward:")
+        print("forward:")
         current = start_loop
         while True:
             next_loop = find_uv_edgeloop_next(current, uv_layer, constrain_by_selected)
+
+            print(next_loop, start_loop)
             if next_loop and next_loop != start_loop:
                 if next_loop in uv_loops:
                     uv_loops.remove(next_loop)
 
-                # print(f" add: {str_loop(next_loop)} - loops left: {len(uv_loops)}" )
+                print(f" add: {str_loop(next_loop)} - loops left: {len(uv_loops)}" )
                 edge_loop.append(next_loop)
                 current = next_loop
             else:
                 break
 
-        # print("reverse:")
+        print("reverse:")
         current = start_loop
         while True:
             prev_loop = find_uv_edgeloop_prev(current, uv_layer, constrain_by_selected)
@@ -402,7 +443,7 @@ def find_uv_edgeloops(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
                 if prev_loop in uv_loops:
                     uv_loops.remove(prev_loop)
 
-                # print(f" add: {str_loop(prev_loop)} - loops left: {len(uv_loops)}" )
+                print(f" add: {str_loop(prev_loop)} - loops left: {len(uv_loops)}" )
                 edge_loop.insert(0, prev_loop)
                 current = prev_loop
             else:
@@ -446,12 +487,10 @@ def select_uv_edgeloop(uv_edgeloop:List[bmesh.types.BMLoop], uv_layer:bmesh.type
 
     for loop in uv_edgeloop:
         loop.uv_select_edge = True
-
-        loop_uv = loop[uv_layer]
         loop.uv_select_vert = True
-
-        for connected in loop.vert.link_loops:
-           
+        
+        loop_uv = loop[uv_layer]
+        for connected in loop.vert.link_loops:           
             connected_uv = connected[uv_layer]
             if is_same_uv_location(connected_uv.uv, loop_uv.uv):
                 connected.uv_select_vert = True

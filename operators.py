@@ -64,14 +64,19 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
         return is_uv_edit_mode()
 
     def execute(self, context):
-        # print("#" * 66)
+        print("")
+        print ("op uvkit_select_uv_edgeloop")
         for obj in context.selected_objects:
             if obj.mode == "EDIT" and obj.type == "MESH":
                 bm = bmesh.from_edit_mesh(obj.data)
                 uv_layer = bm.loops.layers.uv.verify()
 
+                # print(f'uv_select_sync_valid: {bm.uv_select_sync_valid}')
+                if not bm.uv_select_sync_valid:
+                    bm.uv_select_sync_from_mesh()
+
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
-                print(selected_uv_loops)
+                print(f"selected loops count: {len(selected_uv_loops)}")
                 
                 if self.mode == "CONTINUOS":
                     edge_loops = find_uv_edgeloops(selected_uv_loops, uv_layer)
@@ -103,6 +108,7 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
 
                 
                 if(context.scene.tool_settings.use_uv_select_sync):
+                    bm.uv_select_sync_valid = True
                     bm.uv_select_sync_to_mesh()
 
                 bmesh.update_edit_mesh(obj.data)
@@ -127,41 +133,46 @@ class UV_OT_uvkit_select_uv_edgering(bpy.types.Operator):
         return is_uv_edit_mode()
 
     def execute(self, context):
-        # print("#" * 66)
+        print("#" * 66)
+
         for obj in context.selected_objects:
             if obj.mode == "EDIT" and obj.type == "MESH":
                 bm = bmesh.from_edit_mesh(obj.data)
                 uv_layer = bm.loops.layers.uv.verify()
-
+                
+                # print(f'uv_select_sync_valid: {bm.uv_select_sync_valid}')
+                if not bm.uv_select_sync_valid:
+                    bm.uv_select_sync_from_mesh()
+                
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
+
+                for loop in selected_uv_loops:
+                    print(loop.index)
 
                 if self.mode == "CONTINUOS":
                     edge_rings = find_uv_edgerings(
-                        selected_uv_loops, uv_layer, constrain_by_selected=False
-                    )
+                        selected_uv_loops, uv_layer, mode='CONTINUOS')
 
                     for edge_ring in edge_rings:
                         select_uv_edgering(edge_ring, uv_layer)
 
                 elif self.mode == "EXPAND":
-                    #TODO does not work properly yet -> should expand left and right
                     edge_rings = find_uv_edgerings(
-                        selected_uv_loops, uv_layer, constrain_by_selected=True
-                    )
-
-                    for edge_ring in edge_rings:
-                        expand_uv_edgering(edge_ring, uv_layer)
+                        selected_uv_loops, uv_layer, mode='EXPAND')
 
                     for edge_ring in edge_rings:
                         select_uv_edgering(edge_ring, uv_layer)
 
                 elif self.mode == "SHRINK":
                     edge_rings = find_uv_edgerings(
-                        selected_uv_loops, uv_layer, constrain_by_selected=True
-                    )
+                        selected_uv_loops, uv_layer, mode='SHRINK')
 
                     for edgering in edge_rings:
                         shrink_uv_edgering(edgering, uv_layer)
+
+                if(context.scene.tool_settings.use_uv_select_sync):
+                    bm.uv_select_sync_valid = True                  
+                    bm.uv_select_sync_to_mesh()
 
                 bmesh.update_edit_mesh(obj.data)
 
