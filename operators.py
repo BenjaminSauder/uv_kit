@@ -64,7 +64,7 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
         return is_uv_edit_mode()
 
     def execute(self, context):
-        print("")
+        # print("")
         print ("op uvkit_select_uv_edgeloop")
         for obj in context.selected_objects:
             if obj.mode == "EDIT" and obj.type == "MESH":
@@ -72,15 +72,15 @@ class UV_OT_uvkit_select_uv_edgeloop(bpy.types.Operator):
                 uv_layer = bm.loops.layers.uv.verify()
 
                 # print(f'uv_select_sync_valid: {bm.uv_select_sync_valid}')
-                if not bm.uv_select_sync_valid:
+                if context.scene.tool_settings.use_uv_select_sync and not bm.uv_select_sync_valid:
                     bm.uv_select_sync_from_mesh()
 
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
-                print(f"selected loops count: {len(selected_uv_loops)}")
-                
+                #print(f"selected loops count: {len(selected_uv_loops)}")
+               
                 if self.mode == "CONTINUOS":
                     edge_loops = find_uv_edgeloops(selected_uv_loops, uv_layer)
-                    print(f"number of edgeloops: {len(edge_loops)}")
+                    #print(f"number of edgeloops: {len(edge_loops)}")
 
                     for edgeloop in edge_loops:
                         select_uv_edgeloop(edgeloop, uv_layer)
@@ -133,21 +133,19 @@ class UV_OT_uvkit_select_uv_edgering(bpy.types.Operator):
         return is_uv_edit_mode()
 
     def execute(self, context):
-        print("#" * 66)
-
+        #print("#" * 66)
+        print ("op uvkit_select_uv_edgering")
+        
         for obj in context.selected_objects:
             if obj.mode == "EDIT" and obj.type == "MESH":
                 bm = bmesh.from_edit_mesh(obj.data)
                 uv_layer = bm.loops.layers.uv.verify()
                 
                 # print(f'uv_select_sync_valid: {bm.uv_select_sync_valid}')
-                if not bm.uv_select_sync_valid:
+                if context.scene.tool_settings.use_uv_select_sync and not bm.uv_select_sync_valid:
                     bm.uv_select_sync_from_mesh()
                 
                 selected_uv_loops = get_selected_uv_edge_loops(bm, uv_layer)
-
-                for loop in selected_uv_loops:
-                    print(loop.index)
 
                 if self.mode == "CONTINUOS":
                     edge_rings = find_uv_edgerings(

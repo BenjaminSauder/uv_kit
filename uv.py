@@ -234,8 +234,8 @@ def expand_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.type
 def shrink_uv_edgering(uv_edgering:List[bmesh.types.BMLoop], uv_layer:bmesh.types.BMLayerItem) -> None:
     '''shrinks the uv edgering by one edge'''
 
-    for l in uv_edgering:
-        print(f"{l.index}")
+    # for l in uv_edgering:
+    #     print(f"{l.index}")
 
     if len(uv_edgering) < 4:
         return
@@ -419,23 +419,23 @@ def find_uv_edgeloops(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
         start_loop = uv_loops.pop()
         edge_loop = [start_loop]
 
-        print("forward:")
+        # print("forward:")
         current = start_loop
         while True:
             next_loop = find_uv_edgeloop_next(current, uv_layer, constrain_by_selected)
 
-            print(next_loop, start_loop)
+            # print(next_loop, start_loop)
             if next_loop and next_loop != start_loop:
                 if next_loop in uv_loops:
                     uv_loops.remove(next_loop)
 
-                print(f" add: {str_loop(next_loop)} - loops left: {len(uv_loops)}" )
+                # print(f" add: {str_loop(next_loop)} - loops left: {len(uv_loops)}" )
                 edge_loop.append(next_loop)
                 current = next_loop
             else:
                 break
 
-        print("reverse:")
+        # print("reverse:")
         current = start_loop
         while True:
             prev_loop = find_uv_edgeloop_prev(current, uv_layer, constrain_by_selected)
@@ -443,7 +443,7 @@ def find_uv_edgeloops(initial_uv_loops:List[bmesh.types.BMLoop], uv_layer:bmesh.
                 if prev_loop in uv_loops:
                     uv_loops.remove(prev_loop)
 
-                print(f" add: {str_loop(prev_loop)} - loops left: {len(uv_loops)}" )
+                # print(f" add: {str_loop(prev_loop)} - loops left: {len(uv_loops)}" )
                 edge_loop.insert(0, prev_loop)
                 current = prev_loop
             else:
